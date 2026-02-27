@@ -1,67 +1,129 @@
+// store/useMangaStore.ts
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import { Storage } from 'expo-sqlite/kv-store'; // KV-store
+import { MangaItem, MangaType } from '../types/models';
 import { MangaRepository } from '../lib/repository';
-import { MangaItem } from '../types/models';
 
-interface State {
+const repo = new MangaRepository();
+
+type TypeKey = 'drafts' | 'finished' | 'covers';
+
+interface MangaStore {
   drafts: MangaItem[];
   finished: MangaItem[];
   covers: MangaItem[];
-  repo: MangaRepository;
+
   load: () => Promise<void>;
-  add: (item: Omit<MangaItem, 'id'>) => Promise<void>;
-  moveDraftToFinished: (id: string, newChapter?: number) => Promise<void>;
-  reorderFinished: (from: number, to: number) => Promise<void>;
+  add: (item: MangaItem) => Promise<void>;
+  remove: (id: string) => Promise<void>;
+  moveDraftToFinished: (id: string) => Promise<void>;
+
+  getItemById: (id: string) => MangaItem | undefined;
+
   exportData: () => Promise<string>;
   importData: (json: string) => Promise<void>;
 }
 
-export const useMangaStore = create<State>()(
-  persist(
-    (set, get) => ({
-      drafts: [], finished: [], covers: [],
-      repo: new MangaRepository(),
-      async load() {
-        const [drafts, finished, covers] = await Promise.all([
-          get().repo.getByType('draft'),
-          get().repo.getByType('finished'),
-          get().repo.getByType('cover')
-        ]);
-        set({ drafts, finished, covers });
-      },
-      async add(item) {
-        const newItem = await get().repo.save(item);
-        set((state) => ({
-          [item.type + 's']: [newItem, ...state[item.type + 's' as keyof State] as MangaItem[]]
-        }));
-      },
-      async moveDraftToFinished(id, newChapter) {
-        const draft = get().drafts.find(d => d.id === id);
-        if (!draft) return;
-        const updated = await get().repo.save({ ...draft, type: 'finished' as const, chapterNumber: newChapter ?? draft.chapterNumber });
-        set((state) => ({
-          drafts: state.drafts.filter(d => d.id !== id),
-          finished: [updated, ...state.finished.filter(f => f.id !== id)]
-        }));
-      },
-      async reorderFinished(from, to) {
-        const finished = [...get().finished];
-        const [moved] = finished.splice(from, 1);
-        finished.splice(to, 0, moved);
-        // Update chapters sequentially
-        for (let i = 0; i < finished.length; i++) {
-          await get().repo.save({ ...finished[i], chapterNumber: i + 1 });
-        }
-        set({ finished });
-      },
-      async exportData() { return await get().repo.exportJSON(); },
-      async importData(json) { await get().repo.importJSON(json); await get().load(); }
-    }),
-    {
-      name: 'manga-storage',
-      storage: createJSONStorage(() => Storage), // Persist مع SQLite KV[web:7]
-      partialize: (state) => ({ drafts: state.drafts, finished: state.finished, covers: state.covers })
+function getTypeKey(type: MangaType): TypeKey {
+  if (type === 'draft') return 'drafts';
+  if (type === 'finished') return 'finished';
+  return 'covers';
+}
+
+export const useMangaStore = create<MangaStore>((set, get) => ({
+
+  drafts: [],
+  finished: [],
+  covers: [],
+
+  // تحميل من SQLite
+  load: async () => {
+    const items = await repo.getAll();
+
+    set({
+      drafts: items.filter(i => i.type === 'draft'),
+      finished: items
+        .filter(i => i.type === 'finished')
+        .sort((a, b) => a.chapterNumber - b.chapterNumber),
+      covers: items.filter(i => i.type === 'cover'),
+    });
+  },
+
+  // إضافة عنصر
+  add: async (item) => {
+    await repo.save(item);
+
+    const key = getTypeKey(item.type);
+
+    set((state) => ({
+      [key]: [...state[key], item],
+    }));
+  },
+
+  // حذف عنصر
+  remove: async (id) => {
+    const { drafts, finished, covers } = get();
+    const all = [...drafts, ...finished, ...covers];
+    const item = all.find(i => i.id === id);
+    if (!item) return;
+
+    await repo.delete(id);
+
+    const key = getTypeKey(item.type);
+
+    set((state) => ({
+      [key]: state[key].filter(i => i.id !== id),
+    }));
+  },
+
+  // نقل مسودة إلى مكتمل
+  moveDraftToFinished: async (id) => {
+    const { drafts, finished } = get();
+    const draft = drafts.find(d => d.id === id);
+    if (!draft) return;
+
+    const nextChapter =
+      finished.length > 0
+        ? Math.max(...finished.map(f => f.chapterNumber)) + 1
+        : 1;
+
+    const updated: MangaItem = {
+      ...draft,
+      type: 'finished',
+      chapterNumber: nextChapter,
+      updatedAt: Date.now(),
+    };
+
+    await repo.save(updated);
+
+    set((state) => ({
+      drafts: state.drafts.filter(d => d.id !== id),
+      finished: [...state.finished, updated].sort(
+        (a, b) => a.chapterNumber - b.chapterNumber
+      ),
+    }));
+  },
+
+  // البحث عن عنصر
+  getItemById: (id) => {
+    const { drafts, finished, covers } = get();
+    return [...drafts, ...finished, ...covers].find(i => i.id === id);
+  },
+
+  // تصدير
+  exportData: async () => {
+    const items = await repo.getAll();
+    return JSON.stringify(items);
+  },
+
+  // استيراد
+  importData: async (json) => {
+    const items: MangaItem[] = JSON.parse(json);
+
+    for (const item of items) {
+      await repo.save(item);
     }
-  )
-);
+
+    await get().load();
+  },
+
+}));
