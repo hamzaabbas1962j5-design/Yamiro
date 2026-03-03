@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 
 // ────────────────────────────────────────────
@@ -172,7 +172,6 @@ export const createDefaultPomodoro = (): PomodoroState => ({
 // DOMAIN — Pure Utility Functions
 // ────────────────────────────────────────────
 
-/** Calculate the next trigger date from now, handling DST and timezone via native Date */
 export const calculateNextTrigger = (
   alarm: Alarm,
   from: Date = new Date()
@@ -186,45 +185,56 @@ export const calculateNextTrigger = (
   };
 
   const target = buildTarget(from);
+  let result: Date | null = null;
 
   switch (alarm.repeatMode) {
     case RepeatMode.Once:
     case RepeatMode.Daily: {
       if (target <= from) target.setDate(target.getDate() + 1);
-      return target;
+      result = target;
+      break;
     }
     case RepeatMode.Weekdays:
-      return findNextDayInSet(target, from, [1, 2, 3, 4, 5]);
+      result = findNextDayInSet(target, from, [1, 2, 3, 4, 5]);
+      break;
     case RepeatMode.Weekend:
-      return findNextDayInSet(target, from, [0, 6]);
+      result = findNextDayInSet(target, from, [0, 6]);
+      break;
     case RepeatMode.Custom: {
       if (alarm.customDays.length === 0) return null;
-      return findNextDayInSet(target, from, alarm.customDays);
+      result = findNextDayInSet(target, from, alarm.customDays);
+      break;
     }
     case RepeatMode.Periodic: {
       if (target <= from) {
-        target.setDate(target.getDate() + alarm.periodicIntervalDays);
+        target.setDate(target.getDate() + Math.max(1, alarm.periodicIntervalDays));
       }
-      return target;
+      result = target;
+      break;
     }
+    default:
+      return null;
   }
+
+  if (result === null || isNaN(result.getTime()) || result <= from) return null;
+  return result;
 };
 
 const findNextDayInSet = (
   target: Date,
   now: Date,
   validDays: number[]
-): Date => {
-  const result = new Date(target);
+): Date | null => {
   for (let offset = 0; offset < 8; offset++) {
-    const candidate = new Date(result);
-    candidate.setDate(result.getDate() + offset);
+    const candidate = new Date(target);
+    candidate.setDate(target.getDate() + offset);
     if (validDays.includes(candidate.getDay()) && candidate > now) {
       return candidate;
     }
   }
-  result.setDate(result.getDate() + 7);
-  return result;
+  const fallback = new Date(target);
+  fallback.setDate(target.getDate() + 7);
+  return fallback > now ? fallback : null;
 };
 
 export const formatSeconds = (totalSeconds: number): string => {
@@ -260,22 +270,20 @@ const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export const getRepeatLabel = (alarm: Alarm): string => {
   switch (alarm.repeatMode) {
-    case RepeatMode.Once: return 'Once';
-    case RepeatMode.Daily: return 'Every day';
-    case RepeatMode.Weekdays: return 'Weekdays';
-    case RepeatMode.Weekend: return 'Weekends';
+    case RepeatMode.Once:      return 'Once';
+    case RepeatMode.Daily:     return 'Every day';
+    case RepeatMode.Weekdays:  return 'Weekdays';
+    case RepeatMode.Weekend:   return 'Weekends';
     case RepeatMode.Custom:
       return alarm.customDays.map(d => DAY_NAMES_SHORT[d]).join(', ') || 'None';
     case RepeatMode.Periodic:
       return `Every ${alarm.periodicIntervalDays} day(s)`;
+    default:
+      return '';
   }
 };
 
-/** Generate random math challenge */
-export const generateMathChallenge = (): {
-  question: string;
-  answer: number;
-} => {
+export const generateMathChallenge = (): { question: string; answer: number } => {
   const a = Math.floor(Math.random() * 40) + 12;
   const b = Math.floor(Math.random() * 30) + 5;
   const operations = [
@@ -287,18 +295,12 @@ export const generateMathChallenge = (): {
   return { question: `${a} ${op.symbol} ${b}`, answer: op.fn(a, b) };
 };
 
-/** Generate random memory pattern (indices 0–8 for 3×3 grid) */
 export const generateMemoryPattern = (len = 4): number[] =>
   Array.from({ length: len }, () => Math.floor(Math.random() * 9));
 
-/** Compute compliance rate from history */
-export const computeComplianceRate = (
-  entries: AlarmHistoryEntry[]
-): number => {
+export const computeComplianceRate = (entries: AlarmHistoryEntry[]): number => {
   if (entries.length === 0) return 100;
-  const onTime = entries.filter(
-    e => e.status === AlarmHistoryStatus.OnTime
-  ).length;
+  const onTime = entries.filter(e => e.status === AlarmHistoryStatus.OnTime).length;
   return Math.round((onTime / entries.length) * 100);
 };
 
@@ -380,59 +382,88 @@ export class NotificationServiceImpl implements INotificationService {
   private channelConfigured = false;
 
   async requestPermissions(): Promise<boolean> {
-    const { status: existing } = await Notifications.getPermissionsAsync();
-    if (existing === 'granted') return true;
-    const { status } = await Notifications.requestPermissionsAsync({
-      ios: { allowAlert: true, allowSound: true, allowBadge: true },
-    });
-    return status === 'granted';
+    try {
+      const { status: existing } = await Notifications.getPermissionsAsync();
+      if (existing === 'granted') return true;
+      const { status } = await Notifications.requestPermissionsAsync({
+        ios: { allowAlert: true, allowSound: true, allowBadge: true },
+      });
+      return status === 'granted';
+    } catch (err) {
+      console.error('[Notifications] requestPermissions failed', err);
+      return false;
+    }
   }
 
   private async ensureChannel(): Promise<void> {
     if (this.channelConfigured || Platform.OS !== 'android') return;
-    await Notifications.setNotificationChannelAsync('alarms', {
-      name: 'Alarms',
-      importance: Notifications.AndroidImportance.MAX,
-      sound: 'default',
-      enableVibrate: true,
-      lockscreenVisibility:
-        Notifications.AndroidNotificationVisibility.PUBLIC,
-    });
-    this.channelConfigured = true;
+    try {
+      await Notifications.setNotificationChannelAsync('alarms', {
+        name: 'Alarms',
+        importance: Notifications.AndroidImportance.MAX,
+        sound: 'default',
+        enableVibrate: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      });
+      this.channelConfigured = true;
+    } catch (err) {
+      console.error('[Notifications] ensureChannel failed', err);
+    }
   }
 
   async schedule(alarm: Alarm, triggerDate: Date): Promise<string> {
-    await this.ensureChannel();
+    try {
+      await this.ensureChannel();
 
-    return Notifications.scheduleNotificationAsync({
-      content: {
-        title: alarm.label || 'Alarm',
-        body: `${formatAlarmTime(alarm.time)} — Time!`,
-        sound: 'default',
-        priority: Notifications.AndroidNotificationPriority.MAX,
-        data: { alarmId: alarm.id, type: 'alarm' },
-        ...(Platform.OS === 'android' ? { channelId: 'alarms' } : {}),
-      },
-      trigger: { date: triggerDate } as unknown as Notifications.NotificationTriggerInput,
-    });
+      if (!triggerDate || isNaN(triggerDate.getTime()) || triggerDate <= new Date()) {
+        console.warn(`[Notifications] Skipping past or invalid triggerDate for alarm ${alarm.id}`);
+        return '';
+      }
+
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: alarm.label || 'Alarm',
+          body: `${formatAlarmTime(alarm.time)} — Time!`,
+          sound: 'default',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          data: { alarmId: alarm.id, type: 'alarm' },
+          ...(Platform.OS === 'android' ? { channelId: 'alarms' } : {}),
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: triggerDate,
+        },
+      });
+
+      return id;
+    } catch (err) {
+      console.error(`[Notifications] schedule failed for alarm ${alarm.id}`, err);
+      return '';
+    }
   }
 
   async cancel(notificationId: string): Promise<void> {
+    if (!notificationId) return;
     try {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
     } catch {
-      /* notification may already have fired */
+      // notification may already have fired
     }
   }
 
   async cancelAll(): Promise<void> {
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    try {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    } catch (err) {
+      console.error('[Notifications] cancelAll failed', err);
+    }
   }
 }
 
 export class SoundServiceImpl implements ISoundService {
   private sound: Audio.Sound | null = null;
   private _playing = false;
+  private _playLock = false;
   private volumeInterval: ReturnType<typeof setInterval> | null = null;
 
   get playing(): boolean {
@@ -440,9 +471,12 @@ export class SoundServiceImpl implements ISoundService {
   }
 
   async play(volume: number, gradual: boolean): Promise<void> {
-    await this.stop();
+    if (this._playLock) return;
+    this._playLock = true;
 
     try {
+      await this.stop();
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         staysActiveInBackground: true,
@@ -451,10 +485,8 @@ export class SoundServiceImpl implements ISoundService {
         playThroughEarpieceAndroid: false,
       });
 
-      // Use system default alarm sound; in production bundle a custom .wav
       const { sound } = await Audio.Sound.createAsync(
-        // Placeholder — replace with: require('./assets/alarm.wav')
-        { uri: 'https://cdn.jsdelivr.net/gh/nicholasgasior/ggsern-sounds@master/alarm.mp3' },
+        require('./assets/alarm.wav'),
         { shouldPlay: true, isLooping: true, volume: gradual ? 0.05 : volume }
       );
 
@@ -466,42 +498,57 @@ export class SoundServiceImpl implements ISoundService {
         const step = (volume - 0.05) / 30;
         this.volumeInterval = setInterval(async () => {
           cur = Math.min(cur + step, volume);
-          await this.sound?.setVolumeAsync(cur).catch(() => {});
+          try {
+            await this.sound?.setVolumeAsync(cur);
+          } catch {
+            // sound may have been stopped during gradual ramp
+          }
           if (cur >= volume) this.clearVolumeTimer();
         }, 1000);
       }
     } catch (err) {
       console.error('[Sound] play failed', err);
       this._playing = false;
+    } finally {
+      this._playLock = false;
     }
   }
 
   async stop(): Promise<void> {
     this.clearVolumeTimer();
-    if (this.sound) {
-      try {
-        await this.sound.stopAsync();
-        await this.sound.unloadAsync();
-      } catch { /* already unloaded */ }
-      this.sound = null;
-    }
+
+    const soundRef = this.sound;
+    this.sound = null;
     this._playing = false;
+
+    if (soundRef) {
+      try {
+        await soundRef.stopAsync();
+      } catch {
+        // already stopped
+      }
+      try {
+        await soundRef.unloadAsync();
+      } catch {
+        // already unloaded
+      }
+    }
   }
 
   async vibrate(): Promise<void> {
     try {
-      await Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Warning
-      );
-    } catch { /* device may not support haptics */ }
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } catch {
+      // device may not support haptics
+    }
   }
 
   dispose(): void {
-    this.stop();
+    void this.stop();
   }
 
   private clearVolumeTimer(): void {
-    if (this.volumeInterval) {
+    if (this.volumeInterval !== null) {
       clearInterval(this.volumeInterval);
       this.volumeInterval = null;
     }
@@ -514,9 +561,9 @@ export class SoundServiceImpl implements ISoundService {
 
 export class SchedulerEngineImpl implements ISchedulerEngine {
   constructor(
-    private notifications: INotificationService,
-    private storage: IStorageService,
-    private sound: ISoundService
+    private readonly notifications: INotificationService,
+    private readonly storage: IStorageService,
+    private readonly sound: ISoundService
   ) {}
 
   async scheduleAlarm(alarm: Alarm): Promise<Alarm> {
@@ -524,29 +571,33 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
     if (!cleared.enabled) return cleared;
 
     const ids: string[] = [];
-    const trigger = calculateNextTrigger(cleared);
-    if (!trigger) return cleared;
+    const now = new Date();
 
-    // For custom-day repeats, schedule one notification per day
     if (
       cleared.repeatMode === RepeatMode.Custom &&
       cleared.customDays.length > 0
     ) {
       for (const day of cleared.customDays) {
         const d = nextOccurrenceOfDay(day, cleared.time);
-        if (d) ids.push(await this.notifications.schedule(cleared, d));
+        if (d && d > now) {
+          const id = await this.notifications.schedule(cleared, d);
+          if (id) ids.push(id);
+        }
       }
     } else {
-      ids.push(await this.notifications.schedule(cleared, trigger));
+      const trigger = calculateNextTrigger(cleared);
+      if (trigger && trigger > now) {
+        const id = await this.notifications.schedule(cleared, trigger);
+        if (id) ids.push(id);
+      }
     }
 
     return { ...cleared, notificationIds: ids, updatedAt: Date.now() };
   }
 
   async cancelAlarm(alarm: Alarm): Promise<Alarm> {
-    await Promise.all(
-      alarm.notificationIds.map(id => this.notifications.cancel(id))
-    );
+    const validIds = alarm.notificationIds.filter(id => typeof id === 'string' && id.length > 0);
+    await Promise.all(validIds.map(id => this.notifications.cancel(id)));
     return { ...alarm, notificationIds: [], updatedAt: Date.now() };
   }
 
@@ -560,14 +611,18 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
     if (
       !alarm.snoozeEnabled ||
       alarm.currentSnoozeCount >= alarm.maxSnoozeCount
-    )
+    ) {
       return alarm;
+    }
 
     await this.sound.stop();
 
     const snoozeAt = new Date(
-      Date.now() + alarm.snoozeDurationMinutes * 60_000
+      Date.now() + Math.max(1, alarm.snoozeDurationMinutes) * 60_000
     );
+
+    if (snoozeAt <= new Date()) return alarm;
+
     const snoozedLabel = `${alarm.label} (Snooze ${alarm.currentSnoozeCount + 1})`;
     const id = await this.notifications.schedule(
       { ...alarm, label: snoozedLabel },
@@ -577,16 +632,13 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
     return {
       ...alarm,
       currentSnoozeCount: alarm.currentSnoozeCount + 1,
-      notificationIds: [id],
+      notificationIds: id ? [id] : [],
       updatedAt: Date.now(),
     };
   }
 }
 
-const nextOccurrenceOfDay = (
-  dayOfWeek: number,
-  time: AlarmTime
-): Date | null => {
+const nextOccurrenceOfDay = (dayOfWeek: number, time: AlarmTime): Date | null => {
   const now = new Date();
   const target = new Date(now);
   target.setHours(time.hour, time.minute, time.second, 0);
@@ -596,6 +648,8 @@ const nextOccurrenceOfDay = (
   if (daysUntil === 0 && target <= now) daysUntil = 7;
 
   target.setDate(target.getDate() + daysUntil);
+
+  if (isNaN(target.getTime()) || target <= now) return null;
   return target;
 };
 
@@ -603,14 +657,11 @@ const nextOccurrenceOfDay = (
 // SERVICE CONTAINER — Dependency Injection
 // ────────────────────────────────────────────
 
-/**
- * Singleton container: lazily initialises and caches every service.
- * Resolves dependencies via typed accessor properties.
- */
 export class ServiceContainer {
   private static _instance: ServiceContainer | null = null;
   private registry = new Map<string, unknown>();
   private _ready = false;
+  private _initPromise: Promise<void> | null = null;
 
   private constructor() {}
 
@@ -619,10 +670,11 @@ export class ServiceContainer {
     return this._instance;
   }
 
-  private set<T>(key: string, svc: T): void {
+  private setService<T>(key: string, svc: T): void {
     this.registry.set(key, svc);
   }
-  private get<T>(key: string): T {
+
+  private getService<T>(key: string): T {
     const svc = this.registry.get(key);
     if (!svc) throw new Error(`Service "${key}" not registered`);
     return svc as T;
@@ -634,32 +686,46 @@ export class ServiceContainer {
 
   async initialize(): Promise<void> {
     if (this._ready) return;
+    if (this._initPromise) return this._initPromise;
 
-    const storage = new StorageServiceImpl();
-    const notifications = new NotificationServiceImpl();
-    const sound = new SoundServiceImpl();
-    const scheduler = new SchedulerEngineImpl(notifications, storage, sound);
+    this._initPromise = (async (): Promise<void> => {
+      const storage = new StorageServiceImpl();
+      const notifications = new NotificationServiceImpl();
+      const sound = new SoundServiceImpl();
+      const scheduler = new SchedulerEngineImpl(notifications, storage, sound);
 
-    this.set('storage', storage);
-    this.set('notifications', notifications);
-    this.set('sound', sound);
-    this.set('scheduler', scheduler);
+      this.setService('storage', storage);
+      this.setService('notifications', notifications);
+      this.setService('sound', sound);
+      this.setService('scheduler', scheduler);
 
-    await notifications.requestPermissions();
-    this._ready = true;
+      await notifications.requestPermissions();
+      this._ready = true;
+    })();
+
+    try {
+      await this._initPromise;
+    } catch (err) {
+      this._initPromise = null;
+      console.error('[ServiceContainer] initialization failed', err);
+      throw err;
+    }
   }
 
   get storage(): IStorageService {
-    return this.get('storage');
+    return this.getService<IStorageService>('storage');
   }
+
   get notifications(): INotificationService {
-    return this.get('notifications');
+    return this.getService<INotificationService>('notifications');
   }
+
   get sound(): ISoundService {
-    return this.get('sound');
+    return this.getService<ISoundService>('sound');
   }
+
   get scheduler(): ISchedulerEngine {
-    return this.get('scheduler');
+    return this.getService<ISchedulerEngine>('scheduler');
   }
 }
 
@@ -671,43 +737,53 @@ const BG_TASK = 'ALARM_RESCHEDULE_TASK';
 
 export const registerBackgroundTask = async (): Promise<void> => {
   try {
-    TaskManager.defineTask(BG_TASK, async () => {
-      try {
-        const container = ServiceContainer.instance;
-        if (!container.ready) await container.initialize();
-        const alarms = await container.storage.load<Alarm[]>(
-          STORAGE_KEYS.ALARMS
-        );
-        if (alarms?.length) {
-          const updated = await container.scheduler.rescheduleAll(alarms);
-          await container.storage.save(STORAGE_KEYS.ALARMS, updated);
+    if (!TaskManager.isTaskDefined(BG_TASK)) {
+      TaskManager.defineTask(BG_TASK, async () => {
+        try {
+          const container = ServiceContainer.instance;
+          if (!container.ready) await container.initialize();
+          const alarms = await container.storage.load<Alarm[]>(STORAGE_KEYS.ALARMS);
+          if (alarms?.length) {
+            const updated = await container.scheduler.rescheduleAll(alarms);
+            await container.storage.save(STORAGE_KEYS.ALARMS, updated);
+          }
+          return BackgroundFetch.BackgroundFetchResult.NewData;
+        } catch {
+          return BackgroundFetch.BackgroundFetchResult.Failed;
         }
-        return BackgroundFetch.BackgroundFetchResult.NewData;
-      } catch {
-        return BackgroundFetch.BackgroundFetchResult.Failed;
-      }
-    });
+      });
+    }
 
-    await BackgroundFetch.registerTaskAsync(BG_TASK, {
-      minimumInterval: 15 * 60,
-      stopOnTerminate: false,
-      startOnBoot: true,
-    });
+    const registeredTasks = await TaskManager.getRegisteredTasksAsync();
+    const alreadyRegistered = registeredTasks.some(t => t.taskName === BG_TASK);
+
+    if (!alreadyRegistered) {
+      await BackgroundFetch.registerTaskAsync(BG_TASK, {
+        minimumInterval: 15 * 60,
+        stopOnTerminate: false,
+        startOnBoot: true,
+      });
+    }
   } catch (err) {
     console.warn('[BG] Registration failed:', err);
   }
 };
 
 export const performBootRecovery = async (): Promise<Alarm[]> => {
-  const container = ServiceContainer.instance;
-  if (!container.ready) await container.initialize();
+  try {
+    const container = ServiceContainer.instance;
+    if (!container.ready) await container.initialize();
 
-  const stored = await container.storage.load<Alarm[]>(STORAGE_KEYS.ALARMS);
-  if (!stored?.length) return [];
+    const stored = await container.storage.load<Alarm[]>(STORAGE_KEYS.ALARMS);
+    if (!stored?.length) return [];
 
-  const updated = await container.scheduler.rescheduleAll(stored);
-  await container.storage.save(STORAGE_KEYS.ALARMS, updated);
-  return updated;
+    const updated = await container.scheduler.rescheduleAll(stored);
+    await container.storage.save(STORAGE_KEYS.ALARMS, updated);
+    return updated;
+  } catch (err) {
+    console.error('[Boot] performBootRecovery failed', err);
+    return [];
+  }
 };
 
 export const configureNotificationHandler = (): void => {
