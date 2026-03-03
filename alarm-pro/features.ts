@@ -450,28 +450,30 @@ type GlassCardProps = {
   style?: object;
 };
 
-function GlassCardComponent({ children, style }: GlassCardProps) {
-  const t = useTheme();
+const GlassCard = memo(
+  (props: GlassCardProps) => {
+    const { children, style } = props;
+    const t = useTheme();
 
-  return (
-    <View
-      style={[
-        {
-          backgroundColor: t.glassBg,
-          borderWidth: 1,
-          borderColor: t.glassBorder,
-          borderRadius: 20,
-          padding: t.spacing(2),
-        },
-        style,
-      ]}
-    >
-      {children}
-    </View>
-  );
-}
+    return (
+      <View
+        style={[
+          {
+            backgroundColor: t.glassBg,
+            borderWidth: 1,
+            borderColor: t.glassBorder,
+            borderRadius: 20,
+            padding: t.spacing(2),
+          },
+          style,
+        ]}
+      >
+        {children}
+      </View>
+    );
+  }
+);
 
-const GlassCard = memo(GlassCardComponent);
 
 /** Icon button with optional badge */
 type IconBtnProps = {
