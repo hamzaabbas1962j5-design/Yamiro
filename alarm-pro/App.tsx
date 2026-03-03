@@ -30,8 +30,9 @@ import {
   PomodoroScreen,
   HistoryScreen,
   DismissChallengeModal,
-  DismissChallenge,
 } from './features';
+
+import { DismissChallenge } from './core';
 
 // ─── Configure notification behavior (called once at module level) ───
 configureNotificationHandler();
