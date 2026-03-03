@@ -1,4 +1,4 @@
-// ========================================================================
+ // ========================================================================
 // features.ts — Presentation Layer
 // Custom Hooks · UI Components · Screens
 // Separated from domain via hook boundaries; no direct storage/notification calls.
