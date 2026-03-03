@@ -24,6 +24,7 @@
 
     "android": {
       "permissions": [
+        "POST_NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "WAKE_LOCK",
