@@ -716,7 +716,6 @@ export const configureNotificationHandler = (): void => {
       shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
-      priority: Notifications.AndroidNotificationPriority.MAX,
     }),
   });
 };
