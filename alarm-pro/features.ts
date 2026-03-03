@@ -445,267 +445,325 @@ export const useHistory = () => {
 // ────────────────────────────────────────────
 
 /** Glass-morphism card */
-const GlassCard = memo<{
+type GlassCardProps = {
   children: React.ReactNode;
   style?: object;
-}>(({ children, style }) => {
-  const t = useTheme();
-  return (
-    <View
-      style={[
-        {
-          backgroundColor: t.glassBg,
-          borderWidth: 1,
-          borderColor: t.glassBorder,
-          borderRadius: 20,
-          padding: t.spacing(2),
-        },
-        style,
-      ]}
-    >
-      {children}
-    </View>
-  );
-});
+};
+
+const GlassCard = memo(
+  (props: GlassCardProps) => {
+    const { children, style } = props;
+    const t = useTheme();
+
+    return (
+      <View
+        style={[
+          {
+            backgroundColor: t.glassBg,
+            borderWidth: 1,
+            borderColor: t.glassBorder,
+            borderRadius: 20,
+            padding: t.spacing(2),
+          },
+          style,
+        ]}
+      >
+        {children}
+      </View>
+    );
+  }
+);
+
 
 /** Icon button with optional badge */
-const IconBtn = memo<{
+type IconBtnProps = {
   name: keyof typeof Ionicons.glyphMap;
   size?: number;
   color?: string;
   onPress: () => void;
-}>(({ name, size = 24, color, onPress }) => {
-  const t = useTheme();
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: t.glassBg,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Ionicons name={name} size={size} color={color || t.textPrimary} />
-    </TouchableOpacity>
-  );
-});
+};
 
-/** Floating action button */
-const FAB = memo<{ onPress: () => void }>(({ onPress }) => {
-  const t = useTheme();
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+const IconBtn = memo(
+  (props: IconBtnProps) => {
+    const { name, size = 24, color, onPress } = props;
+    const t = useTheme();
 
-  return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          bottom: 24,
-          right: 24,
-          width: 60,
-          height: 60,
-          borderRadius: 30,
-          zIndex: 100,
-        },
-        animStyle,
-      ]}
-    >
+    return (
       <TouchableOpacity
         onPress={onPress}
-        onPressIn={() => {
-          scale.value = withSpring(0.9);
-        }}
-        onPressOut={() => {
-          scale.value = withSpring(1);
-        }}
-        activeOpacity={0.85}
+        activeOpacity={0.7}
         style={{
-          flex: 1,
-          borderRadius: 30,
-          backgroundColor: t.primary,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: t.glassBg,
           alignItems: 'center',
           justifyContent: 'center',
-          shadowColor: t.primary,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.4,
-          shadowRadius: 12,
-          elevation: 8,
         }}
       >
-        <Ionicons name="add" size={30} color="#fff" />
+        <Ionicons name={name} size={size} color={color || t.textPrimary} />
       </TouchableOpacity>
-    </Animated.View>
-  );
-});
+    );
+  }
+);
+
+
+/** Floating action button */
+type FABProps = {
+  onPress: () => void;
+};
+
+const FAB = memo(
+  (props: FABProps) => {
+    const { onPress } = props;
+    const t = useTheme();
+    const scale = useSharedValue(1);
+
+    const animStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: scale.value }],
+    }));
+
+    return (
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            bottom: 24,
+            right: 24,
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            zIndex: 100,
+          },
+          animStyle,
+        ]}
+      >
+        <TouchableOpacity
+          onPress={onPress}
+          onPressIn={() => {
+            scale.value = withSpring(0.9);
+          }}
+          onPressOut={() => {
+            scale.value = withSpring(1);
+          }}
+          activeOpacity={0.85}
+          style={{
+            flex: 1,
+            borderRadius: 30,
+            backgroundColor: t.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: t.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.4,
+            shadowRadius: 12,
+            elevation: 8,
+          }}
+        >
+          <Ionicons name="add" size={30} color="#fff" />
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
+);
 
 /** Pill-shaped chip */
-const Chip = memo<{
+type ChipProps = {
   label: string;
   active?: boolean;
   onPress?: () => void;
-}>(({ label, active = false, onPress }) => {
-  const t = useTheme();
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      style={{
-        paddingHorizontal: t.spacing(1.5),
-        paddingVertical: t.spacing(0.75),
-        borderRadius: 16,
-        backgroundColor: active ? t.primaryDim : t.glassBg,
-        borderWidth: 1,
-        borderColor: active ? t.primary : t.glassBorder,
-        marginRight: t.spacing(1),
-        marginBottom: t.spacing(1),
-      }}
-    >
-      <Text
-        style={[
-          typo.caption,
-          { color: active ? t.primary : t.textSecondary },
-        ]}
+};
+
+const Chip = memo(
+  (props: ChipProps) => {
+    const { label, active = false, onPress } = props;
+    const t = useTheme();
+
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.7}
+        style={{
+          paddingHorizontal: t.spacing(1.5),
+          paddingVertical: t.spacing(0.75),
+          borderRadius: 16,
+          backgroundColor: active ? t.primaryDim : t.glassBg,
+          borderWidth: 1,
+          borderColor: active ? t.primary : t.glassBorder,
+          marginRight: t.spacing(1),
+          marginBottom: t.spacing(1),
+        }}
       >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-});
+        <Text
+          style={[
+            typo.caption,
+            { color: active ? t.primary : t.textSecondary },
+          ]}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+);
 
 // ────────────────────────────────────────────
 // ALARM CARD — with swipe-to-delete
 // ────────────────────────────────────────────
 
-const AlarmCard = memo<{
+type AlarmCardProps = {
   alarm: Alarm;
   onToggle: () => void;
   onPress: () => void;
   onDelete: () => void;
-}>(({ alarm, onToggle, onPress, onDelete }) => {
-  const t = useTheme();
-  const swipeRef = useRef<Swipeable>(null);
+};
 
-  const renderRight = useCallback(
-    () => (
-      <RectButton
-        style={{
-          backgroundColor: t.danger,
-          justifyContent: 'center',
-          alignItems: 'center',
-          width: 80,
-          borderTopRightRadius: 20,
-          borderBottomRightRadius: 20,
-        }}
-        onPress={() => {
-          swipeRef.current?.close();
-          onDelete();
-        }}
+const AlarmCard = memo(
+  (props: AlarmCardProps) => {
+    const { alarm, onToggle, onPress, onDelete } = props;
+    const t = useTheme();
+    const swipeRef = useRef<Swipeable>(null);
+
+    const renderRight = useCallback(
+      () => (
+        <RectButton
+          style={{
+            backgroundColor: t.danger,
+            justifyContent: 'center',
+            alignItems: 'center',
+            width: 80,
+            borderTopRightRadius: 20,
+            borderBottomRightRadius: 20,
+          }}
+          onPress={() => {
+            swipeRef.current?.close();
+            onDelete();
+          }}
+        >
+          <Ionicons name="trash-outline" size={24} color="#fff" />
+        </RectButton>
+      ),
+      [t, onDelete]
+    );
+
+    const timeUntil = useMemo(() => getTimeUntilAlarm(alarm), [alarm]);
+    const repeatLabel = useMemo(() => getRepeatLabel(alarm), [alarm]);
+
+    return (
+      <Animated.View
+        entering={SlideInRight.duration(300)}
+        exiting={SlideOutLeft.duration(200)}
+        layout={Layout.springify()}
       >
-        <Ionicons name="trash-outline" size={24} color="#fff" />
-      </RectButton>
-    ),
-    [t, onDelete]
-  );
-
-  const timeUntil = useMemo(() => getTimeUntilAlarm(alarm), [alarm]);
-  const repeatLabel = useMemo(() => getRepeatLabel(alarm), [alarm]);
-
-  return (
-    <Animated.View entering={SlideInRight.duration(300)} exiting={SlideOutLeft.duration(200)} layout={Layout.springify()}>
-      <Swipeable
-        ref={swipeRef}
-        renderRightActions={renderRight}
-        overshootRight={false}
-        friction={2}
-      >
-        <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-          <GlassCard
-            style={{
-              marginHorizontal: DarkTheme.spacing(2),
-              marginBottom: DarkTheme.spacing(1.5),
-              opacity: alarm.enabled ? 1 : 0.5,
-            }}
-          >
-            <View
+        <Swipeable
+          ref={swipeRef}
+          renderRightActions={renderRight}
+          overshootRight={false}
+          friction={2}
+        >
+          <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+            <GlassCard
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
+                marginHorizontal: DarkTheme.spacing(2),
+                marginBottom: DarkTheme.spacing(1.5),
+                opacity: alarm.enabled ? 1 : 0.5,
               }}
             >
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[
-                    typo.h2,
-                    {
-                      color: alarm.enabled ? t.textPrimary : t.textMuted,
-                      letterSpacing: 1,
-                    },
-                  ]}
-                >
-                  {formatAlarmTime(alarm.time)}
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                  <Text style={[typo.caption, { color: t.textSecondary }]}>
-                    {alarm.label}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      typo.h2,
+                      {
+                        color: alarm.enabled ? t.textPrimary : t.textMuted,
+                        letterSpacing: 1,
+                      },
+                    ]}
+                  >
+                    {formatAlarmTime(alarm.time)}
                   </Text>
-                  <Text style={[typo.caption, { color: t.textMuted, marginLeft: 8 }]}>
-                    {repeatLabel}
-                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginTop: 4,
+                    }}
+                  >
+                    <Text style={[typo.caption, { color: t.textSecondary }]}>
+                      {alarm.label}
+                    </Text>
+                    <Text
+                      style={[
+                        typo.caption,
+                        { color: t.textMuted, marginLeft: 8 },
+                      ]}
+                    >
+                      {repeatLabel}
+                    </Text>
+                  </View>
+                  {alarm.enabled && timeUntil && (
+                    <Text
+                      style={[
+                        typo.caption,
+                        { color: t.accent, marginTop: 2 },
+                      ]}
+                    >
+                      in {timeUntil}
+                    </Text>
+                  )}
                 </View>
-                {alarm.enabled && timeUntil && (
-                  <Text style={[typo.caption, { color: t.accent, marginTop: 2 }]}>
-                    in {timeUntil}
-                  </Text>
+                <Switch
+                  value={alarm.enabled}
+                  onValueChange={onToggle}
+                  trackColor={{ false: t.textMuted, true: t.primaryDim }}
+                  thumbColor={alarm.enabled ? t.primary : t.textSecondary}
+                />
+              </View>
+              {/* Indicator icons */}
+              <View style={{ flexDirection: 'row', marginTop: 8, gap: 8 }}>
+                {alarm.snoozeEnabled && (
+                  <Ionicons
+                    name="alarm-outline"
+                    size={14}
+                    color={t.textMuted}
+                  />
+                )}
+                {alarm.vibrationEnabled && (
+                  <Ionicons
+                    name="phone-portrait-outline"
+                    size={14}
+                    color={t.textMuted}
+                  />
+                )}
+                {alarm.gradualVolume && (
+                  <Ionicons
+                    name="volume-low-outline"
+                    size={14}
+                    color={t.textMuted}
+                  />
+                )}
+                {alarm.dismissChallenge !== DismissChallenge.None && (
+                  <Ionicons
+                    name="game-controller-outline"
+                    size={14}
+                    color={t.textMuted}
+                  />
                 )}
               </View>
-              <Switch
-                value={alarm.enabled}
-                onValueChange={onToggle}
-                trackColor={{ false: t.textMuted, true: t.primaryDim }}
-                thumbColor={alarm.enabled ? t.primary : t.textSecondary}
-              />
-            </View>
-            {/* Indicator icons */}
-            <View style={{ flexDirection: 'row', marginTop: 8, gap: 8 }}>
-              {alarm.snoozeEnabled && (
-                <Ionicons name="alarm-outline" size={14} color={t.textMuted} />
-              )}
-              {alarm.vibrationEnabled && (
-                <Ionicons
-                  name="phone-portrait-outline"
-                  size={14}
-                  color={t.textMuted}
-                />
-              )}
-              {alarm.gradualVolume && (
-                <Ionicons
-                  name="volume-low-outline"
-                  size={14}
-                  color={t.textMuted}
-                />
-              )}
-              {alarm.dismissChallenge !== DismissChallenge.None && (
-                <Ionicons
-                  name="game-controller-outline"
-                  size={14}
-                  color={t.textMuted}
-                />
-              )}
-            </View>
-          </GlassCard>
-        </TouchableOpacity>
-      </Swipeable>
-    </Animated.View>
-  );
-});
+            </GlassCard>
+          </TouchableOpacity>
+        </Swipeable>
+      </Animated.View>
+    );
+  }
+);
+
 
 // ────────────────────────────────────────────
 // NUMBER SCROLLER — used in time picker
@@ -713,690 +771,309 @@ const AlarmCard = memo<{
 
 const ITEM_HEIGHT = 48;
 
-const NumberScroller = memo<{
+type NumberScrollerProps = {
   range: number;
   value: number;
   onChange: (v: number) => void;
   padZero?: boolean;
-}>(({ range, value, onChange, padZero = true }) => {
-  const t = useTheme();
-  const data = useMemo(
-    () => Array.from({ length: range }, (_, i) => i),
-    [range]
-  );
-  const flatRef = useRef<FlatList<number>>(null);
-  const mounted = useRef(false);
+};
 
-  useEffect(() => {
-    if (mounted.current) return;
-    mounted.current = true;
-    setTimeout(() => {
-      flatRef.current?.scrollToOffset({
-        offset: value * ITEM_HEIGHT,
-        animated: false,
-      });
-    }, 100);
-  }, [value]);
+const NumberScroller = memo(
+  (props: NumberScrollerProps) => {
+    const { range, value, onChange, padZero = true } = props;
+    const t = useTheme();
 
-  const keyExtractor = useCallback((item: number) => item.toString(), []);
+    const data = useMemo(
+      () => Array.from({ length: range }, (_, i) => i),
+      [range]
+    );
+    const flatRef = useRef<FlatList<number>>(null);
+    const mounted = useRef(false);
 
-  const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<number>) => {
-      const isActive = item === value;
-      return (
-        <TouchableOpacity
-          onPress={() => {
-            onChange(item);
-            flatRef.current?.scrollToOffset({
-              offset: item * ITEM_HEIGHT,
-              animated: true,
-            });
-          }}
-          style={{
-            height: ITEM_HEIGHT,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text
-            style={[
-              typo.h2,
-              {
-                color: isActive ? t.primary : t.textMuted,
-                fontSize: isActive ? 28 : 20,
-              },
-            ]}
+    useEffect(() => {
+      if (mounted.current) return;
+      mounted.current = true;
+      setTimeout(() => {
+        flatRef.current?.scrollToOffset({
+          offset: value * ITEM_HEIGHT,
+          animated: false,
+        });
+      }, 100);
+    }, [value]);
+
+    const keyExtractor = useCallback(
+      (item: number) => item.toString(),
+      []
+    );
+
+    const renderItem = useCallback(
+      ({ item }: ListRenderItemInfo<number>) => {
+        const isActive = item === value;
+        return (
+          <TouchableOpacity
+            onPress={() => {
+              onChange(item);
+              flatRef.current?.scrollToOffset({
+                offset: item * ITEM_HEIGHT,
+                animated: true,
+              });
+            }}
+            style={{
+              height: ITEM_HEIGHT,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            {padZero ? item.toString().padStart(2, '0') : item}
-          </Text>
-        </TouchableOpacity>
-      );
-    },
-    [value, t, onChange, padZero]
-  );
+            <Text
+              style={[
+                typo.h2,
+                {
+                  color: isActive ? t.primary : t.textMuted,
+                  fontSize: isActive ? 28 : 20,
+                },
+              ]}
+            >
+              {padZero ? item.toString().padStart(2, '0') : item}
+            </Text>
+          </TouchableOpacity>
+        );
+      },
+      [value, t, onChange, padZero]
+    );
 
-  const getItemLayout = useCallback(
-    (_: unknown, index: number) => ({
-      length: ITEM_HEIGHT,
-      offset: ITEM_HEIGHT * index,
-      index,
-    }),
-    []
-  );
+    const getItemLayout = useCallback(
+      (_: unknown, index: number) => ({
+        length: ITEM_HEIGHT,
+        offset: ITEM_HEIGHT * index,
+        index,
+      }),
+      []
+    );
 
-  const onMomentumEnd = useCallback(
-    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-      const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
-      const clamped = Math.max(0, Math.min(range - 1, idx));
-      onChange(clamped);
-    },
-    [range, onChange]
-  );
+    const onMomentumEnd = useCallback(
+      (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+        const idx = Math.round(
+          e.nativeEvent.contentOffset.y / ITEM_HEIGHT
+        );
+        const clamped = Math.max(0, Math.min(range - 1, idx));
+        onChange(clamped);
+      },
+      [range, onChange]
+    );
 
-  return (
-    <View style={{ height: ITEM_HEIGHT * 3, overflow: 'hidden' }}>
-      <FlatList
-        ref={flatRef}
-        data={data}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        getItemLayout={getItemLayout}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
-        showsVerticalScrollIndicator={false}
-        onMomentumScrollEnd={onMomentumEnd}
-        contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}
-      />
-      {/* Highlight bar */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          top: ITEM_HEIGHT,
-          left: 0,
-          right: 0,
-          height: ITEM_HEIGHT,
-          borderTopWidth: 1,
-          borderBottomWidth: 1,
-          borderColor: t.primary + '33',
-        }}
-      />
-    </View>
-  );
-});
+    return (
+      <View style={{ height: ITEM_HEIGHT * 3, overflow: 'hidden' }}>
+        <FlatList
+          ref={flatRef}
+          data={data}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          getItemLayout={getItemLayout}
+          snapToInterval={ITEM_HEIGHT}
+          decelerationRate="fast"
+          showsVerticalScrollIndicator={false}
+          onMomentumScrollEnd={onMomentumEnd}
+          contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}
+        />
+        {/* Highlight bar */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: ITEM_HEIGHT,
+            left: 0,
+            right: 0,
+            height: ITEM_HEIGHT,
+            borderTopWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: t.primary + '33',
+          }}
+        />
+      </View>
+    );
+  }
+);
+
 
 // ────────────────────────────────────────────
 // ALARM EDITOR MODAL
 // ────────────────────────────────────────────
 
-export const AlarmEditorModal = memo<{
+type AlarmEditorModalProps = {
   visible: boolean;
   alarm: Alarm | null;
   onSave: (alarm: Alarm) => void;
   onClose: () => void;
-}>(({ visible, alarm: existingAlarm, onSave, onClose }) => {
-  const t = useTheme();
-  const [draft, setDraft] = useState<Alarm>(createDefaultAlarm);
+};
 
-  useEffect(() => {
-    if (visible) {
-      setDraft(existingAlarm ?? createDefaultAlarm());
-    }
-  }, [visible, existingAlarm]);
+export const AlarmEditorModal = memo(
+  (props: AlarmEditorModalProps) => {
+    const { visible, alarm: existingAlarm, onSave, onClose } = props;
+    const t = useTheme();
+    const [draft, setDraft] = useState<Alarm>(createDefaultAlarm);
 
-  const update = useCallback(
-    <K extends keyof Alarm>(key: K, value: Alarm[K]) => {
-      setDraft(prev => ({ ...prev, [key]: value, updatedAt: Date.now() }));
-    },
-    []
-  );
+    useEffect(() => {
+      if (visible) {
+        setDraft(existingAlarm ?? createDefaultAlarm());
+      }
+    }, [visible, existingAlarm]);
 
-  const updateTime = useCallback(
-    <K extends keyof AlarmTime>(key: K, value: number) => {
-      setDraft(prev => ({
-        ...prev,
-        time: { ...prev.time, [key]: value },
-        updatedAt: Date.now(),
-      }));
-    },
-    []
-  );
+    const update = useCallback(
+      <K extends keyof Alarm>(key: K, value: Alarm[K]) => {
+        setDraft(prev => ({ ...prev, [key]: value, updatedAt: Date.now() }));
+      },
+      []
+    );
 
-  const toggleDay = useCallback(
-    (day: number) => {
-      setDraft(prev => {
-        const days = prev.customDays.includes(day)
-          ? prev.customDays.filter(d => d !== day)
-          : [...prev.customDays, day].sort();
-        return { ...prev, customDays: days };
-      });
-    },
-    []
-  );
+    const updateTime = useCallback(
+      <K extends keyof AlarmTime>(key: K, value: number) => {
+        setDraft(prev => ({
+          ...prev,
+          time: { ...prev.time, [key]: value },
+          updatedAt: Date.now(),
+        }));
+      },
+      []
+    );
 
-  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  const repeatOptions: { mode: RepeatMode; label: string }[] = [
-    { mode: RepeatMode.Once, label: 'Once' },
-    { mode: RepeatMode.Daily, label: 'Daily' },
-    { mode: RepeatMode.Weekdays, label: 'Weekdays' },
-    { mode: RepeatMode.Weekend, label: 'Weekend' },
-    { mode: RepeatMode.Custom, label: 'Custom' },
-    { mode: RepeatMode.Periodic, label: 'Periodic' },
-  ];
+    const toggleDay = useCallback(
+      (day: number) => {
+        setDraft(prev => {
+          const days = prev.customDays.includes(day)
+            ? prev.customDays.filter(d => d !== day)
+            : [...prev.customDays, day].sort();
+          return { ...prev, customDays: days };
+        });
+      },
+      []
+    );
 
-  const challengeOptions: { ch: DismissChallenge; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-    { ch: DismissChallenge.None, label: 'None', icon: 'close-circle-outline' },
-    { ch: DismissChallenge.Math, label: 'Math', icon: 'calculator-outline' },
-    { ch: DismissChallenge.Shake, label: 'Shake', icon: 'phone-portrait-outline' },
-    { ch: DismissChallenge.TypePhrase, label: 'Type', icon: 'text-outline' },
-    { ch: DismissChallenge.MemoryPattern, label: 'Memory', icon: 'grid-outline' },
-  ];
+    const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View style={{ flex: 1, backgroundColor: t.bg }}>
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: t.spacing(2),
-            paddingTop: t.spacing(6),
-          }}
-        >
-          <TouchableOpacity onPress={onClose}>
-            <Text style={[typo.body, { color: t.textSecondary }]}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={[typo.h3, { color: t.textPrimary }]}>
-            {existingAlarm ? 'Edit Alarm' : 'New Alarm'}
-          </Text>
-          <TouchableOpacity onPress={() => onSave(draft)}>
-            <Text style={[typo.body, { color: t.primary, fontWeight: '600' }]}>
-              Save
-            </Text>
-          </TouchableOpacity>
-        </View>
+    const repeatOptions: {
+      mode: RepeatMode;
+      label: string;
+    }[] = [
+      { mode: RepeatMode.Once, label: 'Once' },
+      { mode: RepeatMode.Daily, label: 'Daily' },
+      { mode: RepeatMode.Weekdays, label: 'Weekdays' },
+      { mode: RepeatMode.Weekend, label: 'Weekend' },
+      { mode: RepeatMode.Custom, label: 'Custom' },
+      { mode: RepeatMode.Periodic, label: 'Periodic' },
+    ];
 
-        <ScrollView
-          contentContainerStyle={{ padding: t.spacing(2), paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Time Picker */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <NumberScroller
-                range={24}
-                value={draft.time.hour}
-                onChange={v => updateTime('hour', v)}
-              />
-              <Text style={[typo.h1, { color: t.primary, marginHorizontal: 8 }]}>
-                :
+    const challengeOptions: {
+      ch: DismissChallenge;
+      label: string;
+      icon: keyof typeof Ionicons.glyphMap;
+    }[] = [
+      { ch: DismissChallenge.None, label: 'None', icon: 'close-circle-outline' },
+      { ch: DismissChallenge.Math, label: 'Math', icon: 'calculator-outline' },
+      { ch: DismissChallenge.Shake, label: 'Shake', icon: 'phone-portrait-outline' },
+      { ch: DismissChallenge.TypePhrase, label: 'Type', icon: 'text-outline' },
+      { ch: DismissChallenge.MemoryPattern, label: 'Memory', icon: 'grid-outline' },
+    ];
+
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={onClose}
+      >
+        <View style={{ flex: 1, backgroundColor: t.bg }}>
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: t.spacing(2),
+              paddingTop: t.spacing(6),
+            }}
+          >
+            <TouchableOpacity onPress={onClose}>
+              <Text style={[typo.body, { color: t.textSecondary }]}>
+                Cancel
               </Text>
-              <NumberScroller
-                range={60}
-                value={draft.time.minute}
-                onChange={v => updateTime('minute', v)}
-              />
-              <Text style={[typo.h1, { color: t.primary, marginHorizontal: 8 }]}>
-                :
+            </TouchableOpacity>
+            <Text style={[typo.h3, { color: t.textPrimary }]}>
+              {existingAlarm ? 'Edit Alarm' : 'New Alarm'}
+            </Text>
+            <TouchableOpacity onPress={() => onSave(draft)}>
+              <Text
+                style={[typo.body, { color: t.primary, fontWeight: '600' }]}
+              >
+                Save
               </Text>
-              <NumberScroller
-                range={60}
-                value={draft.time.second}
-                onChange={v => updateTime('second', v)}
-              />
-            </View>
-          </GlassCard>
+            </TouchableOpacity>
+          </View>
 
-          {/* Label */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <Text style={[typo.caption, { color: t.textSecondary, marginBottom: 4 }]}>
-              Label
-            </Text>
-            <TextInput
-              value={draft.label}
-              onChangeText={txt => update('label', txt)}
-              placeholderTextColor={t.textMuted}
-              placeholder="Alarm label"
-              style={[
-                typo.body,
-                {
-                  color: t.textPrimary,
-                  backgroundColor: t.surfaceLight,
-                  borderRadius: 12,
-                  padding: t.spacing(1.5),
-                },
-              ]}
-            />
-          </GlassCard>
-
-          {/* Repeat */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <Text
-              style={[
-                typo.caption,
-                { color: t.textSecondary, marginBottom: 8 },
-              ]}
-            >
-              Repeat
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {repeatOptions.map(opt => (
-                <Chip
-                  key={opt.mode}
-                  label={opt.label}
-                  active={draft.repeatMode === opt.mode}
-                  onPress={() => update('repeatMode', opt.mode)}
-                />
-              ))}
-            </View>
-            {draft.repeatMode === RepeatMode.Custom && (
+          <ScrollView
+            contentContainerStyle={{
+              padding: t.spacing(2),
+              paddingBottom: 100,
+            }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Time Picker */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
               <View
                 style={{
                   flexDirection: 'row',
-                  justifyContent: 'space-around',
-                  marginTop: 12,
-                }}
-              >
-                {dayLabels.map((label, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    onPress={() => toggleDay(idx)}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      backgroundColor: draft.customDays.includes(idx)
-                        ? t.primary
-                        : t.glassBg,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: draft.customDays.includes(idx)
-                        ? t.primary
-                        : t.glassBorder,
-                    }}
-                  >
-                    <Text
-                      style={[
-                        typo.caption,
-                        {
-                          color: draft.customDays.includes(idx)
-                            ? '#fff'
-                            : t.textSecondary,
-                          fontWeight: '600',
-                        },
-                      ]}
-                    >
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-            {draft.repeatMode === RepeatMode.Periodic && (
-              <View
-                style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}
-              >
-                <Text style={[typo.body, { color: t.textSecondary }]}>
-                  Every{' '}
-                </Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  value={draft.periodicIntervalDays.toString()}
-                  onChangeText={txt => {
-                    const n = parseInt(txt, 10);
-                    if (!isNaN(n) && n > 0) update('periodicIntervalDays', n);
-                  }}
-                  style={[
-                    typo.body,
-                    {
-                      color: t.primary,
-                      backgroundColor: t.surfaceLight,
-                      borderRadius: 8,
-                      paddingHorizontal: 12,
-                      paddingVertical: 4,
-                      width: 60,
-                      textAlign: 'center',
-                    },
-                  ]}
-                />
-                <Text style={[typo.body, { color: t.textSecondary }]}>
-                  {' '}day(s)
-                </Text>
-              </View>
-            )}
-          </GlassCard>
-
-          {/* Snooze */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons
-                  name="alarm-outline"
-                  size={18}
-                  color={t.textSecondary}
-                />
-                <Text
-                  style={[
-                    typo.body,
-                    { color: t.textPrimary, marginLeft: 8 },
-                  ]}
-                >
-                  Snooze
-                </Text>
-              </View>
-              <Switch
-                value={draft.snoozeEnabled}
-                onValueChange={v => update('snoozeEnabled', v)}
-                trackColor={{ false: t.textMuted, true: t.primaryDim }}
-                thumbColor={draft.snoozeEnabled ? t.primary : t.textSecondary}
-              />
-            </View>
-            {draft.snoozeEnabled && (
-              <View style={{ marginTop: 12 }}>
-                <Text style={[typo.caption, { color: t.textSecondary }]}>
-                  Duration: {draft.snoozeDurationMinutes} min · Max: {draft.maxSnoozeCount}x
-                </Text>
-                <View style={{ flexDirection: 'row', marginTop: 8, gap: 8 }}>
-                  {[1, 3, 5, 10, 15].map(m => (
-                    <Chip
-                      key={m}
-                      label={`${m}m`}
-                      active={draft.snoozeDurationMinutes === m}
-                      onPress={() => update('snoozeDurationMinutes', m)}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-          </GlassCard>
-
-          {/* Sound & Vibration */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 12,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons
-                  name="volume-high-outline"
-                  size={18}
-                  color={t.textSecondary}
-                />
-                <Text
-                  style={[
-                    typo.body,
-                    { color: t.textPrimary, marginLeft: 8 },
-                  ]}
-                >
-                  Gradual Volume
-                </Text>
-              </View>
-              <Switch
-                value={draft.gradualVolume}
-                onValueChange={v => update('gradualVolume', v)}
-                trackColor={{ false: t.textMuted, true: t.primaryDim }}
-                thumbColor={draft.gradualVolume ? t.primary : t.textSecondary}
-              />
-            </View>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons
-                  name="phone-portrait-outline"
-                  size={18}
-                  color={t.textSecondary}
-                />
-                <Text
-                  style={[
-                    typo.body,
-                    { color: t.textPrimary, marginLeft: 8 },
-                  ]}
-                >
-                  Vibration
-                </Text>
-              </View>
-              <Switch
-                value={draft.vibrationEnabled}
-                onValueChange={v => update('vibrationEnabled', v)}
-                trackColor={{ false: t.textMuted, true: t.primaryDim }}
-                thumbColor={
-                  draft.vibrationEnabled ? t.primary : t.textSecondary
-                }
-              />
-            </View>
-          </GlassCard>
-
-          {/* Dismiss Challenge */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <Text
-              style={[
-                typo.caption,
-                { color: t.textSecondary, marginBottom: 8 },
-              ]}
-            >
-              Dismiss Challenge
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {challengeOptions.map(opt => (
-                <TouchableOpacity
-                  key={opt.ch}
-                  onPress={() => update('dismissChallenge', opt.ch)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor:
-                      draft.dismissChallenge === opt.ch
-                        ? t.primaryDim
-                        : t.glassBg,
-                    borderWidth: 1,
-                    borderColor:
-                      draft.dismissChallenge === opt.ch
-                        ? t.primary
-                        : t.glassBorder,
-                    borderRadius: 12,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    marginRight: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  <Ionicons
-                    name={opt.icon}
-                    size={16}
-                    color={
-                      draft.dismissChallenge === opt.ch
-                        ? t.primary
-                        : t.textSecondary
-                    }
-                  />
-                  <Text
-                    style={[
-                      typo.caption,
-                      {
-                        color:
-                          draft.dismissChallenge === opt.ch
-                            ? t.primary
-                            : t.textSecondary,
-                        marginLeft: 4,
-                      },
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </GlassCard>
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-});
-
-// ────────────────────────────────────────────
-// DISMISS CHALLENGE MODAL
-// ────────────────────────────────────────────
-
-export const DismissChallengeModal = memo<{
-  visible: boolean;
-  challenge: DismissChallenge;
-  onDismiss: () => void;
-}>(({ visible, challenge, onDismiss }) => {
-  const t = useTheme();
-  const [mathQ, setMathQ] = useState(generateMathChallenge);
-  const [answer, setAnswer] = useState('');
-  const [pattern, setPattern] = useState<number[]>([]);
-  const [userPattern, setUserPattern] = useState<number[]>([]);
-  const [phase, setPhase] = useState<'show' | 'input'>('show');
-  const [typeTarget] = useState('WAKE UP NOW');
-  const [typeInput, setTypeInput] = useState('');
-
-  useEffect(() => {
-    if (visible) {
-      setMathQ(generateMathChallenge());
-      setAnswer('');
-      const p = generateMemoryPattern(4);
-      setPattern(p);
-      setUserPattern([]);
-      setPhase('show');
-      setTypeInput('');
-      // Show pattern for 3 seconds then switch to input
-      if (challenge === DismissChallenge.MemoryPattern) {
-        setTimeout(() => setPhase('input'), 3000);
-      }
-    }
-  }, [visible, challenge]);
-
-  const checkMath = useCallback(() => {
-    if (parseInt(answer, 10) === mathQ.answer) onDismiss();
-  }, [answer, mathQ, onDismiss]);
-
-  const checkType = useCallback(() => {
-    if (typeInput.toUpperCase().trim() === typeTarget) onDismiss();
-  }, [typeInput, typeTarget, onDismiss]);
-
-  const tapCell = useCallback(
-    (idx: number) => {
-      const next = [...userPattern, idx];
-      setUserPattern(next);
-      if (next.length === pattern.length) {
-        if (next.every((v, i) => v === pattern[i])) {
-          onDismiss();
-        } else {
-          setUserPattern([]);
-          const p = generateMemoryPattern(4);
-          setPattern(p);
-          setPhase('show');
-          setTimeout(() => setPhase('input'), 3000);
-        }
-      }
-    },
-    [userPattern, pattern, onDismiss]
-  );
-
-  if (challenge === DismissChallenge.None) {
-    // Auto-dismiss
-    if (visible) onDismiss();
-    return null;
-  }
-
-  return (
-    <Modal visible={visible} animationType="fade" transparent>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.85)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: t.spacing(3),
-        }}
-      >
-        <GlassCard style={{ width: '100%', maxWidth: 360, padding: t.spacing(3) }}>
-          {challenge === DismissChallenge.Math && (
-            <>
-              <Text style={[typo.h3, { color: t.textPrimary, textAlign: 'center', marginBottom: 16 }]}>
-                Solve to dismiss
-              </Text>
-              <Text style={[typo.h1, { color: t.primary, textAlign: 'center', marginBottom: 20 }]}>
-                {mathQ.question}
-              </Text>
-              <TextInput
-                keyboardType="number-pad"
-                value={answer}
-                onChangeText={setAnswer}
-                placeholder="Your answer"
-                placeholderTextColor={t.textMuted}
-                style={[
-                  typo.h3,
-                  {
-                    color: t.textPrimary,
-                    backgroundColor: t.surfaceLight,
-                    borderRadius: 12,
-                    padding: t.spacing(1.5),
-                    textAlign: 'center',
-                    marginBottom: 16,
-                  },
-                ]}
-              />
-              <TouchableOpacity
-                onPress={checkMath}
-                style={{
-                  backgroundColor: t.primary,
-                  borderRadius: 16,
-                  padding: t.spacing(1.5),
+                  justifyContent: 'center',
                   alignItems: 'center',
                 }}
               >
-                <Text style={[typo.body, { color: '#fff', fontWeight: '600' }]}>
-                  Submit
+                <NumberScroller
+                  range={24}
+                  value={draft.time.hour}
+                  onChange={v => updateTime('hour', v)}
+                />
+                <Text
+                  style={[
+                    typo.h1,
+                    { color: t.primary, marginHorizontal: 8 },
+                  ]}
+                >
+                  :
                 </Text>
-              </TouchableOpacity>
-            </>
-          )}
+                <NumberScroller
+                  range={60}
+                  value={draft.time.minute}
+                  onChange={v => updateTime('minute', v)}
+                />
+                <Text
+                  style={[
+                    typo.h1,
+                    { color: t.primary, marginHorizontal: 8 },
+                  ]}
+                >
+                  :
+                </Text>
+                <NumberScroller
+                  range={60}
+                  value={draft.time.second}
+                  onChange={v => updateTime('second', v)}
+                />
+              </View>
+            </GlassCard>
 
-          {challenge === DismissChallenge.TypePhrase && (
-            <>
-              <Text style={[typo.h3, { color: t.textPrimary, textAlign: 'center', marginBottom: 16 }]}>
-                Type this phrase
-              </Text>
-              <Text style={[typo.h2, { color: t.accent, textAlign: 'center', marginBottom: 20, letterSpacing: 2 }]}>
-                {typeTarget}
+            {/* Label */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
+              <Text
+                style={[
+                  typo.caption,
+                  { color: t.textSecondary, marginBottom: 4 },
+                ]}
+              >
+                Label
               </Text>
               <TextInput
-                value={typeInput}
-                onChangeText={setTypeInput}
-                placeholder="Type here..."
+                value={draft.label}
+                onChangeText={txt => update('label', txt)}
                 placeholderTextColor={t.textMuted}
-                autoCapitalize="characters"
+                placeholder="Alarm label"
                 style={[
                   typo.body,
                   {
@@ -1404,103 +1081,649 @@ export const DismissChallengeModal = memo<{
                     backgroundColor: t.surfaceLight,
                     borderRadius: 12,
                     padding: t.spacing(1.5),
-                    textAlign: 'center',
-                    marginBottom: 16,
                   },
                 ]}
               />
-              <TouchableOpacity
-                onPress={checkType}
-                style={{
-                  backgroundColor: t.primary,
-                  borderRadius: 16,
-                  padding: t.spacing(1.5),
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={[typo.body, { color: '#fff', fontWeight: '600' }]}>
-                  Submit
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
+            </GlassCard>
 
-          {challenge === DismissChallenge.MemoryPattern && (
-            <>
-              <Text style={[typo.h3, { color: t.textPrimary, textAlign: 'center', marginBottom: 16 }]}>
-                {phase === 'show' ? 'Memorize the pattern' : 'Repeat the pattern'}
+            {/* Repeat */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
+              <Text
+                style={[
+                  typo.caption,
+                  { color: t.textSecondary, marginBottom: 8 },
+                ]}
+              >
+                Repeat
               </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {repeatOptions.map(opt => (
+                  <Chip
+                    key={opt.mode}
+                    label={opt.label}
+                    active={draft.repeatMode === opt.mode}
+                    onPress={() => update('repeatMode', opt.mode)}
+                  />
+                ))}
+              </View>
+              {draft.repeatMode === RepeatMode.Custom && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-around',
+                    marginTop: 12,
+                  }}
+                >
+                  {dayLabels.map((label, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => toggleDay(idx)}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: draft.customDays.includes(idx)
+                          ? t.primary
+                          : t.glassBg,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: draft.customDays.includes(idx)
+                          ? t.primary
+                          : t.glassBorder,
+                      }}
+                    >
+                      <Text
+                        style={[
+                          typo.caption,
+                          {
+                            color: draft.customDays.includes(idx)
+                              ? '#fff'
+                              : t.textSecondary,
+                            fontWeight: '600',
+                          },
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              {draft.repeatMode === RepeatMode.Periodic && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginTop: 12,
+                  }}
+                >
+                  <Text style={[typo.body, { color: t.textSecondary }]}>
+                    Every{' '}
+                  </Text>
+                  <TextInput
+                    keyboardType="number-pad"
+                    value={draft.periodicIntervalDays.toString()}
+                    onChangeText={txt => {
+                      const n = parseInt(txt, 10);
+                      if (!isNaN(n) && n > 0)
+                        update('periodicIntervalDays', n);
+                    }}
+                    style={[
+                      typo.body,
+                      {
+                        color: t.primary,
+                        backgroundColor: t.surfaceLight,
+                        borderRadius: 8,
+                        paddingHorizontal: 12,
+                        paddingVertical: 4,
+                        width: 60,
+                        textAlign: 'center',
+                      },
+                    ]}
+                  />
+                  <Text style={[typo.body, { color: t.textSecondary }]}>
+                    {' '}day(s)
+                  </Text>
+                </View>
+              )}
+            </GlassCard>
+
+            {/* Snooze */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
               <View
                 style={{
                   flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  justifyContent: 'center',
-                  gap: 8,
-                }}
-              >
-                {Array.from({ length: 9 }, (_, i) => {
-                  const isHighlighted =
-                    phase === 'show' && pattern.includes(i);
-                  const isUserTapped = userPattern.includes(i);
-                  return (
-                    <TouchableOpacity
-                      key={i}
-                      disabled={phase === 'show'}
-                      onPress={() => tapCell(i)}
-                      style={{
-                        width: 72,
-                        height: 72,
-                        borderRadius: 16,
-                        backgroundColor: isHighlighted
-                          ? t.primary
-                          : isUserTapped
-                          ? t.accent
-                          : t.surfaceLight,
-                        borderWidth: 1,
-                        borderColor: t.glassBorder,
-                      }}
-                    />
-                  );
-                })}
-              </View>
-            </>
-          )}
-
-          {challenge === DismissChallenge.Shake && (
-            <>
-              <Ionicons
-                name="phone-portrait-outline"
-                size={64}
-                color={t.primary}
-                style={{ alignSelf: 'center', marginBottom: 16 }}
-              />
-              <Text style={[typo.h3, { color: t.textPrimary, textAlign: 'center', marginBottom: 16 }]}>
-                Shake your phone!
-              </Text>
-              <Text style={[typo.caption, { color: t.textSecondary, textAlign: 'center', marginBottom: 20 }]}>
-                Shake vigorously to dismiss the alarm
-              </Text>
-              {/* In production: use Accelerometer from expo-sensors */}
-              <TouchableOpacity
-                onPress={onDismiss}
-                style={{
-                  backgroundColor: t.primary,
-                  borderRadius: 16,
-                  padding: t.spacing(1.5),
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                 }}
               >
-                <Text style={[typo.body, { color: '#fff', fontWeight: '600' }]}>
-                  Simulate Shake
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                >
+                  <Ionicons
+                    name="alarm-outline"
+                    size={18}
+                    color={t.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      typo.body,
+                      { color: t.textPrimary, marginLeft: 8 },
+                    ]}
+                  >
+                    Snooze
+                  </Text>
+                </View>
+                <Switch
+                  value={draft.snoozeEnabled}
+                  onValueChange={v => update('snoozeEnabled', v)}
+                  trackColor={{ false: t.textMuted, true: t.primaryDim }}
+                  thumbColor={
+                    draft.snoozeEnabled ? t.primary : t.textSecondary
+                  }
+                />
+              </View>
+              {draft.snoozeEnabled && (
+                <View style={{ marginTop: 12 }}>
+                  <Text
+                    style={[typo.caption, { color: t.textSecondary }]}
+                  >
+                    Duration: {draft.snoozeDurationMinutes} min · Max:{' '}
+                    {draft.maxSnoozeCount}x
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      marginTop: 8,
+                      gap: 8,
+                    }}
+                  >
+                    {[1, 3, 5, 10, 15].map(m => (
+                      <Chip
+                        key={m}
+                        label={`${m}m`}
+                        active={draft.snoozeDurationMinutes === m}
+                        onPress={() => update('snoozeDurationMinutes', m)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
+            </GlassCard>
+
+            {/* Sound & Vibration */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                }}
+              >
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                >
+                  <Ionicons
+                    name="volume-high-outline"
+                    size={18}
+                    color={t.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      typo.body,
+                      { color: t.textPrimary, marginLeft: 8 },
+                    ]}
+                  >
+                    Gradual Volume
+                  </Text>
+                </View>
+                <Switch
+                  value={draft.gradualVolume}
+                  onValueChange={v => update('gradualVolume', v)}
+                  trackColor={{ false: t.textMuted, true: t.primaryDim }}
+                  thumbColor={
+                    draft.gradualVolume ? t.primary : t.textSecondary
+                  }
+                />
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                >
+                  <Ionicons
+                    name="phone-portrait-outline"
+                    size={18}
+                    color={t.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      typo.body,
+                      { color: t.textPrimary, marginLeft: 8 },
+                    ]}
+                  >
+                    Vibration
+                  </Text>
+                </View>
+                <Switch
+                  value={draft.vibrationEnabled}
+                  onValueChange={v => update('vibrationEnabled', v)}
+                  trackColor={{ false: t.textMuted, true: t.primaryDim }}
+                  thumbColor={
+                    draft.vibrationEnabled ? t.primary : t.textSecondary
+                  }
+                />
+              </View>
+            </GlassCard>
+
+            {/* Dismiss Challenge */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
+              <Text
+                style={[
+                  typo.caption,
+                  { color: t.textSecondary, marginBottom: 8 },
+                ]}
+              >
+                Dismiss Challenge
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {challengeOptions.map(opt => (
+                  <TouchableOpacity
+                    key={opt.ch}
+                    onPress={() => update('dismissChallenge', opt.ch)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor:
+                        draft.dismissChallenge === opt.ch
+                          ? t.primaryDim
+                          : t.glassBg,
+                      borderWidth: 1,
+                      borderColor:
+                        draft.dismissChallenge === opt.ch
+                          ? t.primary
+                          : t.glassBorder,
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      marginRight: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Ionicons
+                      name={opt.icon}
+                      size={16}
+                      color={
+                        draft.dismissChallenge === opt.ch
+                          ? t.primary
+                          : t.textSecondary
+                      }
+                    />
+                    <Text
+                      style={[
+                        typo.caption,
+                        {
+                          color:
+                            draft.dismissChallenge === opt.ch
+                              ? t.primary
+                              : t.textSecondary,
+                          marginLeft: 4,
+                        },
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </GlassCard>
+          </ScrollView>
+        </View>
+      </Modal>
+    );
+  }
+);
+
+
+// ────────────────────────────────────────────
+// DISMISS CHALLENGE MODAL
+// ────────────────────────────────────────────
+
+type DismissChallengeModalProps = {
+  visible: boolean;
+  challenge: DismissChallenge;
+  onDismiss: () => void;
+};
+
+export const DismissChallengeModal = memo(
+  (props: DismissChallengeModalProps) => {
+    const { visible, challenge, onDismiss } = props;
+    const t = useTheme();
+    const [mathQ, setMathQ] = useState(generateMathChallenge);
+    const [answer, setAnswer] = useState('');
+    const [pattern, setPattern] = useState<number[]>([]);
+    const [userPattern, setUserPattern] = useState<number[]>([]);
+    const [phase, setPhase] = useState<'show' | 'input'>('show');
+    const [typeTarget] = useState('WAKE UP NOW');
+    const [typeInput, setTypeInput] = useState('');
+
+    useEffect(() => {
+      if (visible) {
+        setMathQ(generateMathChallenge());
+        setAnswer('');
+        const p = generateMemoryPattern(4);
+        setPattern(p);
+        setUserPattern([]);
+        setPhase('show');
+        setTypeInput('');
+        // Show pattern for 3 seconds then switch to input
+        if (challenge === DismissChallenge.MemoryPattern) {
+          setTimeout(() => setPhase('input'), 3000);
+        }
+      }
+    }, [visible, challenge]);
+
+    const checkMath = useCallback(() => {
+      if (parseInt(answer, 10) === mathQ.answer) onDismiss();
+    }, [answer, mathQ, onDismiss]);
+
+    const checkType = useCallback(() => {
+      if (typeInput.toUpperCase().trim() === typeTarget) onDismiss();
+    }, [typeInput, typeTarget, onDismiss]);
+
+    const tapCell = useCallback(
+      (idx: number) => {
+        const next = [...userPattern, idx];
+        setUserPattern(next);
+        if (next.length === pattern.length) {
+          if (next.every((v, i) => v === pattern[i])) {
+            onDismiss();
+          } else {
+            setUserPattern([]);
+            const p = generateMemoryPattern(4);
+            setPattern(p);
+            setPhase('show');
+            setTimeout(() => setPhase('input'), 3000);
+          }
+        }
+      },
+      [userPattern, pattern, onDismiss]
+    );
+
+    if (challenge === DismissChallenge.None) {
+      // Auto-dismiss
+      if (visible) onDismiss();
+      return null;
+    }
+
+    return (
+      <Modal visible={visible} animationType="fade" transparent>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: t.spacing(3),
+          }}
+        >
+          <GlassCard
+            style={{
+              width: '100%',
+              maxWidth: 360,
+              padding: t.spacing(3),
+            }}
+          >
+            {challenge === DismissChallenge.Math && (
+              <>
+                <Text
+                  style={[
+                    typo.h3,
+                    {
+                      color: t.textPrimary,
+                      textAlign: 'center',
+                      marginBottom: 16,
+                    },
+                  ]}
+                >
+                  Solve to dismiss
                 </Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </GlassCard>
-      </View>
-    </Modal>
-  );
-});
+                <Text
+                  style={[
+                    typo.h1,
+                    {
+                      color: t.primary,
+                      textAlign: 'center',
+                      marginBottom: 20,
+                    },
+                  ]}
+                >
+                  {mathQ.question}
+                </Text>
+                <TextInput
+                  keyboardType="number-pad"
+                  value={answer}
+                  onChangeText={setAnswer}
+                  placeholder="Your answer"
+                  placeholderTextColor={t.textMuted}
+                  style={[
+                    typo.h3,
+                    {
+                      color: t.textPrimary,
+                      backgroundColor: t.surfaceLight,
+                      borderRadius: 12,
+                      padding: t.spacing(1.5),
+                      textAlign: 'center',
+                      marginBottom: 16,
+                    },
+                  ]}
+                />
+                <TouchableOpacity
+                  onPress={checkMath}
+                  style={{
+                    backgroundColor: t.primary,
+                    borderRadius: 16,
+                    padding: t.spacing(1.5),
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={[
+                      typo.body,
+                      { color: '#fff', fontWeight: '600' },
+                    ]}
+                  >
+                    Submit
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {challenge === DismissChallenge.TypePhrase && (
+              <>
+                <Text
+                  style={[
+                    typo.h3,
+                    {
+                      color: t.textPrimary,
+                      textAlign: 'center',
+                      marginBottom: 16,
+                    },
+                  ]}
+                >
+                  Type this phrase
+                </Text>
+                <Text
+                  style={[
+                    typo.h2,
+                    {
+                      color: t.accent,
+                      textAlign: 'center',
+                      marginBottom: 20,
+                      letterSpacing: 2,
+                    },
+                  ]}
+                >
+                  {typeTarget}
+                </Text>
+                <TextInput
+                  value={typeInput}
+                  onChangeText={setTypeInput}
+                  placeholder="Type here..."
+                  placeholderTextColor={t.textMuted}
+                  autoCapitalize="characters"
+                  style={[
+                    typo.body,
+                    {
+                      color: t.textPrimary,
+                      backgroundColor: t.surfaceLight,
+                      borderRadius: 12,
+                      padding: t.spacing(1.5),
+                      textAlign: 'center',
+                      marginBottom: 16,
+                    },
+                  ]}
+                />
+                <TouchableOpacity
+                  onPress={checkType}
+                  style={{
+                    backgroundColor: t.primary,
+                    borderRadius: 16,
+                    padding: t.spacing(1.5),
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={[
+                      typo.body,
+                      { color: '#fff', fontWeight: '600' },
+                    ]}
+                  >
+                    Submit
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {challenge === DismissChallenge.MemoryPattern && (
+              <>
+                <Text
+                  style={[
+                    typo.h3,
+                    {
+                      color: t.textPrimary,
+                      textAlign: 'center',
+                      marginBottom: 16,
+                    },
+                  ]}
+                >
+                  {phase === 'show'
+                    ? 'Memorize the pattern'
+                    : 'Repeat the pattern'}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  {Array.from({ length: 9 }, (_, i) => {
+                    const isHighlighted =
+                      phase === 'show' && pattern.includes(i);
+                    const isUserTapped = userPattern.includes(i);
+                    return (
+                      <TouchableOpacity
+                        key={i}
+                        disabled={phase === 'show'}
+                        onPress={() => tapCell(i)}
+                        style={{
+                          width: 72,
+                          height: 72,
+                          borderRadius: 16,
+                          backgroundColor: isHighlighted
+                            ? t.primary
+                            : isUserTapped
+                            ? t.accent
+                            : t.surfaceLight,
+                          borderWidth: 1,
+                          borderColor: t.glassBorder,
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            {challenge === DismissChallenge.Shake && (
+              <>
+                <Ionicons
+                  name="phone-portrait-outline"
+                  size={64}
+                  color={t.primary}
+                  style={{ alignSelf: 'center', marginBottom: 16 }}
+                />
+                <Text
+                  style={[
+                    typo.h3,
+                    {
+                      color: t.textPrimary,
+                      textAlign: 'center',
+                      marginBottom: 16,
+                    },
+                  ]}
+                >
+                  Shake your phone!
+                </Text>
+                <Text
+                  style={[
+                    typo.caption,
+                    {
+                      color: t.textSecondary,
+                      textAlign: 'center',
+                      marginBottom: 20,
+                    },
+                  ]}
+                >
+                  Shake vigorously to dismiss the alarm
+                </Text>
+                {/* In production: use Accelerometer from expo-sensors */}
+                <TouchableOpacity
+                  onPress={onDismiss}
+                  style={{
+                    backgroundColor: t.primary,
+                    borderRadius: 16,
+                    padding: t.spacing(1.5),
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={[
+                      typo.body,
+                      { color: '#fff', fontWeight: '600' },
+                    ]}
+                  >
+                    Simulate Shake
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </GlassCard>
+        </View>
+      </Modal>
+    );
+  }
+);
+
 
 // ────────────────────────────────────────────
 // SCREEN — Alarms List
