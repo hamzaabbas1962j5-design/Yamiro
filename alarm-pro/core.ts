@@ -674,10 +674,11 @@ export class SoundServiceImpl implements ISoundService {
       // Configure audio session for alarm-style playback
       try {
         await AudioModule.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-          shouldDuckAndroid: false,
-        });
+  playsInSilentModeIOS: true,
+  staysActiveInBackground: true,
+  shouldDuckAndroid: false,
+  interruptionModeAndroid: 'doNotMix',
+});
       } catch {
         // Non-critical: continue even if audio mode configuration fails
       }
@@ -694,12 +695,11 @@ export class SoundServiceImpl implements ISoundService {
         return;
       }
 
-      // Create a new AudioPlayer instance with the alarm source
-      const player = new AudioPlayer({
-  source,
-  loop: true,
-  volume: initialVolume
-});
+    // Create a new AudioPlayer instance with the alarm source
+const player = AudioModule.createAudioPlayer(source);
+
+player.loop = true;
+player.volume = initialVolume;
 
 this.player = player;
 this._playing = true;
