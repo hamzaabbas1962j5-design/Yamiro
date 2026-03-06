@@ -2,7 +2,8 @@
 // App.tsx — Entry Point
 // Error Boundary · Theme · Navigation · Boot Recovery · Notification Hub
 // ========================================================================
-
+import { Buffer } from "buffer";
+global.Buffer = Buffer;
 import React, { useEffect, useState, useCallback, useRef, Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { View, Text, ActivityIndicator, StatusBar, Platform, TouchableOpacity } from 'react-native';
