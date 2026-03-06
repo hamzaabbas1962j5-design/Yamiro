@@ -10,6 +10,11 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo/vector-icons": "^14.0.4",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-navigation/bottom-tabs": "^7.2.0",
+    "@react-navigation/native": "^7.0.14",
+    "buffer": "^6.0.3",
     "expo": "~55.0.4",
     "expo-audio": "~0.3.2",
     "expo-background-task": "~1.0.0",
@@ -17,10 +22,6 @@
     "expo-notifications": "~0.31.1",
     "expo-status-bar": "~2.2.3",
     "expo-task-manager": "~12.0.5",
-    "@expo/vector-icons": "^14.0.4",
-    "@react-native-async-storage/async-storage": "2.1.2",
-    "@react-navigation/bottom-tabs": "^7.2.0",
-    "@react-navigation/native": "^7.0.14",
     "react": "19.2.4",
     "react-native": "0.83.2",
     "react-native-gesture-handler": "~2.24.0",
@@ -30,8 +31,8 @@
     "react-native-svg": "~15.11.2"
   },
   "devDependencies": {
-  "@types/react": "^19.2.14",
-  "typescript": "~5.8.3"
-},
+    "@types/react": "^19.2.14",
+    "typescript": "~5.8.3"
+  },
   "private": true
 }
