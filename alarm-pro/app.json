@@ -10,7 +10,9 @@
     "plugins": [
       "expo-notifications",
       "expo-audio",
-      "expo-background-task"
+      "expo-background-task",
+      "expo-font",
+      "expo-asset"
     ],
     "splash": {
       "image": "./assets/splashicon.png",
