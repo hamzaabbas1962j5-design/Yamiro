@@ -1,10 +1,11 @@
 // ========================================================================
 // App.tsx — Entry Point
-// Theme Provider · Navigation · Boot Recovery · Notification Listeners
+// Error Boundary · Theme · Navigation · Boot Recovery · Notification Hub
 // ========================================================================
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, ActivityIndicator, StatusBar, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef, Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import { View, Text, ActivityIndicator, StatusBar, Platform, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -16,10 +17,12 @@ import {
   configureNotificationHandler,
   registerBackgroundTask,
   performBootRecovery,
+  recordAlarmEvent,
   Alarm,
   AlarmHistoryStatus,
+  DismissChallenge,
   STORAGE_KEYS,
-  generateId,
+  validateAlarms,
 } from './core';
 
 import {
@@ -32,12 +35,80 @@ import {
   DismissChallengeModal,
 } from './features';
 
-import { DismissChallenge } from './core';
-
-// ─── Configure notification behavior (called once at module level) ───
+// ── Configure notification behavior at module level ──
 configureNotificationHandler();
 
-// ─── Navigation ───
+// ── Error Boundary ──
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[ErrorBoundary]', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: DarkTheme.bg,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 32,
+          }}
+        >
+          <Ionicons name="warning-outline" size={64} color={DarkTheme.danger} />
+          <Text
+            style={{
+              color: DarkTheme.textPrimary,
+              fontSize: 18,
+              fontWeight: '600',
+              marginTop: 20,
+              textAlign: 'center',
+            }}
+          >
+            Something went wrong
+          </Text>
+          <Text
+            style={{
+              color: DarkTheme.textSecondary,
+              fontSize: 14,
+              marginTop: 8,
+              textAlign: 'center',
+            }}
+          >
+            {this.state.error?.message ?? 'An unexpected error occurred'}
+          </Text>
+          <TouchableOpacity
+            onPress={() => this.setState({ hasError: false, error: null })}
+            style={{
+              marginTop: 24,
+              backgroundColor: DarkTheme.primary,
+              paddingHorizontal: 32,
+              paddingVertical: 14,
+              borderRadius: 24,
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ── Navigation ──
 const Tab = createBottomTabNavigator();
 
 const NAV_THEME = {
@@ -45,6 +116,7 @@ const NAV_THEME = {
   dark: true,
   colors: {
     ...DefaultTheme.colors,
+    notification: DarkTheme.primary,
     background: DarkTheme.bg,
     card: DarkTheme.surface,
     text: DarkTheme.textPrimary,
@@ -62,14 +134,13 @@ const TAB_ICONS: Record<string, { active: TabIconName; inactive: TabIconName }> 
   History: { active: 'analytics', inactive: 'analytics-outline' },
 };
 
-// ─── Root App Component ───
+// ── Root App ──
 export default function App() {
   const [ready, setReady] = useState(false);
   const [challengeVisible, setChallengeVisible] = useState(false);
   const [activeChallenge, setActiveChallenge] = useState(DismissChallenge.None);
   const [triggeredAlarmId, setTriggeredAlarmId] = useState<string | null>(null);
 
-  // Refs for notification subscriptions — cleaned up on unmount
   const receivedSub = useRef<Notifications.Subscription | null>(null);
   const responseSub = useRef<Notifications.Subscription | null>(null);
 
@@ -81,11 +152,7 @@ export default function App() {
       try {
         const container = ServiceContainer.instance;
         await container.initialize();
-
-        // Boot recovery: reschedule all persisted alarms
         await performBootRecovery();
-
-        // Register background task for alarm rescheduling on reboot
         await registerBackgroundTask();
       } catch (err) {
         console.error('[App] Initialization failed:', err);
@@ -95,95 +162,92 @@ export default function App() {
     };
 
     init();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   // ── Notification Listeners ──
   useEffect(() => {
-    // When a notification is received while app is in foreground
-    receivedSub.current = Notifications.addNotificationReceivedListener(
-      async (notification) => {
+    receivedSub.current = Notifications.addNotificationReceivedListener(async (notification) => {
+      try {
         const data = notification.request.content.data as {
           alarmId?: string;
           type?: string;
         };
 
-        if (data?.type === 'alarm' && data.alarmId) {
-          const container = ServiceContainer.instance;
+        if (data?.type !== 'alarm' || !data.alarmId) return;
 
-          // Play sound & vibrate
-          await container.sound.play(0.8, false);
-          await container.sound.vibrate();
+        const container = ServiceContainer.instance;
+        if (!container.ready) return;
 
-          // Load alarm to check for dismiss challenge
-          const alarms = await container.storage.load<Alarm[]>(STORAGE_KEYS.ALARMS);
-          const alarm = alarms?.find(a => a.id === data.alarmId);
+        await container.sound.play(0.8, false);
+        await container.sound.vibrate();
 
-          if (alarm && alarm.dismissChallenge !== DismissChallenge.None) {
-            setTriggeredAlarmId(alarm.id);
-            setActiveChallenge(alarm.dismissChallenge);
-            setChallengeVisible(true);
-          } else {
-            // No challenge → auto-stop after brief moment
-            setTimeout(() => container.sound.stop(), 30_000);
-          }
+        const raw = await container.storage.load<unknown>(STORAGE_KEYS.ALARMS);
+        const alarms = validateAlarms(raw ?? []);
+        const alarm = alarms.find(a => a.id === data.alarmId);
 
-          // Record history entry
-          const entry = {
-            id: generateId(),
-            alarmId: data.alarmId,
-            alarmLabel: alarm?.label || 'Unknown',
-            scheduledTime: Date.now(),
-            actualTime: Date.now(),
-            status: AlarmHistoryStatus.OnTime,
-            snoozeCount: 0,
-          };
-          const history = (await container.storage.load<Array<typeof entry>>(
-            STORAGE_KEYS.HISTORY
-          )) || [];
-          await container.storage.save(STORAGE_KEYS.HISTORY, [
-            entry,
-            ...history,
-          ].slice(0, 500));
+        if (alarm && alarm.dismissChallenge !== DismissChallenge.None) {
+          setTriggeredAlarmId(alarm.id);
+          setActiveChallenge(alarm.dismissChallenge);
+          setChallengeVisible(true);
+        } else {
+          // Auto-stop sound after 30 seconds if no challenge
+          setTimeout(() => {
+            try {
+              container.sound.stop();
+            } catch {
+              // Non-critical
+            }
+          }, 30_000);
         }
+
+        await recordAlarmEvent(
+          data.alarmId,
+          alarm?.label || 'Unknown',
+          AlarmHistoryStatus.OnTime
+        );
+      } catch (err) {
+        console.error('[App] notification handler error:', err);
       }
-    );
+    });
 
-    // When user taps on a notification
-    responseSub.current =
-      Notifications.addNotificationResponseReceivedListener(
-        async (response) => {
-          const data = response.notification.request.content.data as {
-            alarmId?: string;
-          };
-          if (data?.alarmId) {
-            // Could navigate to alarm or show challenge
-            console.log('[App] Notification tapped for alarm:', data.alarmId);
-          }
+    responseSub.current = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      try {
+        const container = ServiceContainer.instance;
+        if (!container.ready) return;
+
+        const data = response.notification.request.content.data as { alarmId?: string };
+        if (data?.alarmId) {
+          console.log('[App] Notification tapped for alarm:', data.alarmId);
         }
-      );
+      } catch {
+        // Non-critical
+      }
+    });
 
-    // Cleanup subscriptions to prevent memory leaks
     return () => {
       receivedSub.current?.remove();
       responseSub.current?.remove();
     };
   }, []);
 
-  // ── Challenge Dismiss Handler ──
+  // ── Challenge Dismiss ──
   const handleChallengeDismiss = useCallback(async () => {
     setChallengeVisible(false);
     setActiveChallenge(DismissChallenge.None);
     setTriggeredAlarmId(null);
 
-    // Stop alarm sound
-    const container = ServiceContainer.instance;
-    await container.sound.stop();
+    try {
+      const container = ServiceContainer.instance;
+      if (container.ready) {
+        await container.sound.stop();
+      }
+    } catch (err) {
+      console.error('[App] handleChallengeDismiss error:', err);
+    }
   }, []);
 
-  // ── Loading Screen ──
+  // ── Loading ──
   if (!ready) {
     return (
       <View
@@ -195,73 +259,61 @@ export default function App() {
         }}
       >
         <ActivityIndicator size="large" color={DarkTheme.primary} />
-        <Text
-          style={{
-            color: DarkTheme.textSecondary,
-            marginTop: 16,
-            fontSize: 15,
-          }}
-        >
+        <Text style={{ color: DarkTheme.textSecondary, marginTop: 16, fontSize: 15 }}>
           Initializing...
         </Text>
       </View>
     );
   }
 
-  // ── Main App ──
+  // ── Main ──
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeContext.Provider value={DarkTheme}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor={DarkTheme.bg}
-          translucent={false}
-        />
-        <NavigationContainer theme={NAV_THEME}>
-          <Tab.Navigator
-            screenOptions={({ route }) => ({
-              headerShown: false,
-              tabBarActiveTintColor: DarkTheme.primary,
-              tabBarInactiveTintColor: DarkTheme.textMuted,
-              tabBarStyle: {
-                backgroundColor: DarkTheme.surface,
-                borderTopColor: DarkTheme.glassBorder,
-                borderTopWidth: 1,
-                paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-                paddingTop: 8,
-                height: Platform.OS === 'ios' ? 88 : 64,
-              },
-              tabBarLabelStyle: {
-                fontSize: 11,
-                fontWeight: '500',
-              },
-              tabBarIcon: ({ focused, color, size }) => {
-                const icons = TAB_ICONS[route.name];
-                if (!icons) return null;
-                return (
-                  <Ionicons
-                    name={focused ? icons.active : icons.inactive}
-                    size={size}
-                    color={color}
-                  />
-                );
-              },
-            })}
-          >
-            <Tab.Screen name="Alarms" component={AlarmsScreen} />
-            <Tab.Screen name="Timer" component={TimerScreen} />
-            <Tab.Screen name="Pomodoro" component={PomodoroScreen} />
-            <Tab.Screen name="History" component={HistoryScreen} />
-          </Tab.Navigator>
-        </NavigationContainer>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeContext.Provider value={DarkTheme}>
+          <StatusBar barStyle="light-content" backgroundColor={DarkTheme.bg} translucent={false} />
+          <NavigationContainer theme={NAV_THEME}>
+            <Tab.Navigator
+              screenOptions={({ route }) => ({
+                headerShown: false,
+                tabBarActiveTintColor: DarkTheme.primary,
+                tabBarInactiveTintColor: DarkTheme.textMuted,
+                tabBarStyle: {
+                  backgroundColor: DarkTheme.surface,
+                  borderTopColor: DarkTheme.glassBorder,
+                  borderTopWidth: 1,
+                  paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+                  paddingTop: 8,
+                  height: Platform.OS === 'ios' ? 88 : 64,
+                },
+                tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
+                tabBarIcon: ({ focused, color, size }) => {
+                  const icons = TAB_ICONS[route.name];
+                  if (!icons) return null;
+                  return (
+                    <Ionicons
+                      name={focused ? icons.active : icons.inactive}
+                      size={size}
+                      color={color}
+                    />
+                  );
+                },
+              })}
+            >
+              <Tab.Screen name="Alarms" component={AlarmsScreen} />
+              <Tab.Screen name="Timer" component={TimerScreen} />
+              <Tab.Screen name="Pomodoro" component={PomodoroScreen} />
+              <Tab.Screen name="History" component={HistoryScreen} />
+            </Tab.Navigator>
+          </NavigationContainer>
 
-        {/* Global dismiss challenge overlay */}
-        <DismissChallengeModal
-          visible={challengeVisible}
-          challenge={activeChallenge}
-          onDismiss={handleChallengeDismiss}
-        />
-      </ThemeContext.Provider>
-    </GestureHandlerRootView>
+          <DismissChallengeModal
+            visible={challengeVisible}
+            challenge={activeChallenge}
+            onDismiss={handleChallengeDismiss}
+          />
+        </ThemeContext.Provider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
