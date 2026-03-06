@@ -180,18 +180,18 @@ export default function App() {
         const container = ServiceContainer.instance;
         if (!container.ready) return;
 
-        await container.sound.play(0.8, false);
-        await container.sound.vibrate();
-
         const raw = await container.storage.load<unknown>(STORAGE_KEYS.ALARMS);
-        const alarms = validateAlarms(raw ?? []);
-        const alarm = alarms.find(a => a.id === data.alarmId);
+const alarms = validateAlarms(raw ?? []);
+const alarm = alarms.find(a => a.id === data.alarmId);
 
-        if (alarm && alarm.dismissChallenge !== DismissChallenge.None) {
-          setTriggeredAlarmId(alarm.id);
-          setActiveChallenge(alarm.dismissChallenge);
-          setChallengeVisible(true);
-        } else {
+await container.sound.play(alarm?.volume ?? 0.8, alarm?.gradualVolume ?? false);
+await container.sound.vibrate();
+
+if (alarm && alarm.dismissChallenge !== DismissChallenge.None) {
+  setTriggeredAlarmId(alarm.id);
+  setActiveChallenge(alarm.dismissChallenge);
+  setChallengeVisible(true);
+} else {
           // Auto-stop sound after 30 seconds if no challenge
           setTimeout(() => {
             try {
