@@ -4,7 +4,7 @@
     "slug": "alarm-pro",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/Illustration.png",
     "userInterfaceStyle": "dark",
     "plugins": [
       "expo-notifications",
