@@ -120,7 +120,7 @@ export const DarkTheme: Theme = {
   textPrimary: '#EAEAFF',
   textSecondary: '#8B8DA3',
   textMuted: '#4A4D65',
-  spacing: (f: number) => f * 8,
+  spacing: (f: number): number => f * 8,
 };
 
 export const ThemeContext = createContext<Theme>(DarkTheme);
@@ -746,6 +746,15 @@ const WheelPicker = memo(({
   const currentValueRef = useRef(value);
   const lastHapticIdx = useRef(value);
   const scrollSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  useEffect(() => {
+  return () => {
+    if (scrollSettleTimer.current) {
+      clearTimeout(scrollSettleTimer.current);
+    }
+  };
+}, []);
+
   const isMounted = useRef(false);
 
   // Scroll to initial value on mount
@@ -805,23 +814,32 @@ const WheelPicker = memo(({
   return (
     <View style={{ height: WHEEL_HEIGHT, width: 80, overflow: 'hidden' }}>
       <FlatList
-        ref={flatRef}
-        data={data}
-        keyExtractor={wheelKeyExtractor}
-        renderItem={renderItem}
-        getItemLayout={wheelGetItemLayout}
-        snapToInterval={WHEEL_ITEM_H}
-        decelerationRate={0.88}
-        showsVerticalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        onMomentumScrollEnd={onMomentumEnd}
-        onScrollEndDrag={onScrollEndDrag}
-        contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
-        removeClippedSubviews
-        maxToRenderPerBatch={range}
-        windowSize={3}
-      />
+  ref={flatRef}
+  data={data}
+  keyExtractor={wheelKeyExtractor}
+  renderItem={renderItem}
+  getItemLayout={wheelGetItemLayout}
+
+  snapToInterval={WHEEL_ITEM_H}
+  snapToAlignment="center"
+  decelerationRate="fast"
+
+  showsVerticalScrollIndicator={false}
+  scrollEnabled={true}
+  bounces={false}
+
+  onScroll={onScroll}
+  scrollEventThrottle={16}
+  onMomentumScrollEnd={onMomentumEnd}
+  onScrollEndDrag={onScrollEndDrag}
+
+  contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
+
+  removeClippedSubviews={false}
+initialNumToRender={5}
+windowSize={5}
+maxToRenderPerBatch={5}
+/>
       {/* Top/Bottom dimming masks + center highlight */}
       <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
         <View style={{ height: WHEEL_PAD, backgroundColor: 'rgba(10,14,26,0.75)' }} />
@@ -1039,10 +1057,9 @@ export const AlarmEditorModal = memo(({
         </View>
 
         <ScrollView
-          contentContainerStyle={{ padding: t.spacing(2), paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+  scrollEnabled={false}
+  contentContainerStyle={{ padding: t.spacing(2), paddingBottom: 120 }}
+>
           {/* Time Picker */}
           <GlassCard style={{ marginBottom: t.spacing(2) }}>
             <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
