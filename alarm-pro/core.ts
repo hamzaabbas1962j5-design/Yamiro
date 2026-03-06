@@ -745,22 +745,38 @@ player.play();
     // Capture and null-out the reference atomically so concurrent
     // stop() calls don't double-dispose the same player
     const ref = this.player;
-    this.player = null;
-    this._playing = false;
 
-    if (ref) {
-      try { ref.pause(); } catch { /* already paused or released */ }
-      try { ref.remove(); } catch { /* already removed */ }
-    }
-  }
+if (!ref) {
+  this._playing = false;
+  return;
+}
 
-  async vibrate(): Promise<void> {
-    try {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    } catch {
-      // Device may not support haptics
-    }
+// Cut the reference immediately to prevent any simultaneous use
+this.player = null;
+this._playing = false;
+
+try {
+  if (!ref.paused) {
+    ref.pause();
   }
+} catch {}
+
+// Releasing resources from memory
+try {
+  ref.remove();
+} catch {}
+
+async vibrate(): Promise<void> {
+  try {
+    if (this.vibrationTimer) return;
+
+    this.vibrationTimer = setInterval(() => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    }, 1200);
+  } catch {
+    // Device may not support haptics
+  }
+}
 
   dispose(): void {
     this.stop().catch(() => {});
