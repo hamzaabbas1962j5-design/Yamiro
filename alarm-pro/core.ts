@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundTask from 'expo-background-task';
-import { Audio } from 'expo-audio';
+import { AudioPlayer, AudioModule } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 
 // ╔═══════════════════════════════════════════════════════════════════════╗
@@ -644,10 +644,10 @@ export class NotificationServiceImpl implements INotificationService {
   }
 }
 
-// ── Sound Implementation ─────────────────────────────────────────────────
+// ── Sound Implementation (expo-audio AudioPlayer API) ────────────────────
 
 export class SoundServiceImpl implements ISoundService {
-  private sound: Audio.Sound | null = null;
+  private player: AudioPlayer | null = null;
   private _playing = false;
   private _locked = false;
   private volumeTimer: ReturnType<typeof setInterval> | null = null;
@@ -657,56 +657,66 @@ export class SoundServiceImpl implements ISoundService {
   }
 
   async play(volume: number, gradual: boolean): Promise<void> {
+    // Prevent concurrent play() calls from racing
     if (this._locked) return;
     this._locked = true;
 
     try {
+      // Tear down any previous playback before starting a new one
       await this.stop();
 
-      // Guard: ensure volume is valid
+      // Guard: ensure volume is a sane finite number
       if (!volume || volume <= 0 || !Number.isFinite(volume)) {
         volume = 0.5;
       }
       volume = clamp(volume, 0, 1);
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: false,
-        playThroughEarpieceAndroid: false,
-      });
-
-      const initialVolume = gradual ? 0.05 : volume;
-
-      let source: any;
+      // Configure audio session for alarm-style playback
       try {
-        source = require('../assets/alarm.wav');
+        await AudioModule.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          shouldDuckAndroid: false,
+        });
       } catch {
-        console.warn('Alarm sound missing, falling back to vibration');
+        // Non-critical: continue even if audio mode configuration fails
+      }
+
+      const initialVolume = gradual ? Math.max(0.1, volume * 0.2) : volume;
+
+      // Load the bundled alarm asset
+      let source: number;
+      try {
+        source = require('./assets/alarm.wav');
+      } catch {
+        console.warn('[Sound] Alarm sound asset missing, falling back to vibration');
         await this.vibrate();
         return;
       }
 
-      const { sound: soundObj } = await Audio.Sound.createAsync(source, {
-        shouldPlay: true,
-        isLooping: true,
-        volume: initialVolume,
-      });
+      // Create a new AudioPlayer instance with the alarm source
+      const player = new AudioPlayer({
+  source,
+  loop: true,
+  volume: initialVolume
+});
 
-      this.sound = soundObj;
-      this._playing = true;
+this.player = player;
+this._playing = true;
 
+player.play();
+
+      // Gradually ramp volume from initialVolume → targetVolume over ~30 s
       if (gradual) {
         const targetVolume = volume;
         let current = initialVolume;
         const step = (targetVolume - initialVolume) / 30;
 
-        this.volumeTimer = setInterval(async () => {
+        this.volumeTimer = setInterval(() => {
           current = Math.min(current + step, targetVolume);
           try {
-            if (this.sound) {
-              await this.sound.setVolumeAsync(current);
+            if (this.player) {
+              this.player.volume = current;
             }
           } catch {
             this.clearVolumeTimer();
@@ -717,22 +727,30 @@ export class SoundServiceImpl implements ISoundService {
     } catch (err) {
       console.error('[Sound] play failed', err);
       this._playing = false;
-      // Fallback: vibrate silently so the alarm doesn't fail completely
-      await this.vibrate();
+      // Fallback: vibrate so the alarm is not completely silent
+      try {
+        await this.vibrate();
+      } catch {
+        // Last-resort: swallow to avoid crash
+      }
     } finally {
       this._locked = false;
     }
   }
 
   async stop(): Promise<void> {
+    // Always clear the volume ramp timer first
     this.clearVolumeTimer();
-    const ref = this.sound;
-    this.sound = null;
+
+    // Capture and null-out the reference atomically so concurrent
+    // stop() calls don't double-dispose the same player
+    const ref = this.player;
+    this.player = null;
     this._playing = false;
 
     if (ref) {
-      try { await ref.stopAsync(); } catch { /* already stopped */ }
-      try { await ref.unloadAsync(); } catch { /* already unloaded */ }
+      try { ref.pause(); } catch { /* already paused or released */ }
+      try { ref.remove(); } catch { /* already removed */ }
     }
   }
 
