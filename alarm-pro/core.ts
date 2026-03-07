@@ -116,7 +116,9 @@ export interface PomodoroState {
 
 // ── Utility Type ─────────────────────────────────────────────────────────
 
-export type Mutable<T> = { -readonly [K in keyof T]: T[K] extends ReadonlyArray<infer U> ? U[] : T[K] };
+export type Mutable<T> = {
+  -readonly [K in keyof T]: T[K] extends ReadonlyArray<infer U> ? U[] : T[K];
+};
 
 // ── ID Generation ────────────────────────────────────────────────────────
 
@@ -177,7 +179,8 @@ export const createDefaultPomodoro = (): PomodoroState => ({
 
 const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+const clamp = (v: number, lo: number, hi: number): number =>
+  Math.max(lo, Math.min(hi, v));
 
 export const formatSeconds = (totalSeconds: number): string => {
   if (!Number.isFinite(totalSeconds)) return '00:00';
@@ -208,7 +211,7 @@ export const getRepeatLabel = (alarm: Alarm): string => {
       return 'Weekends';
     case RepeatMode.Custom:
       return alarm.customDays.length > 0
-        ? alarm.customDays.map(d => DAY_NAMES_SHORT[d]).join(', ')
+        ? alarm.customDays.map((d) => DAY_NAMES_SHORT[d]).join(', ')
         : 'None';
     case RepeatMode.Periodic:
       return `Every ${alarm.periodicIntervalDays} day(s)`;
@@ -217,7 +220,10 @@ export const getRepeatLabel = (alarm: Alarm): string => {
   }
 };
 
-export const calculateNextTrigger = (alarm: Alarm, from: Date = new Date()): Date | null => {
+export const calculateNextTrigger = (
+  alarm: Alarm,
+  from: Date = new Date()
+): Date | null => {
   if (!alarm.enabled) return null;
 
   const buildTarget = (base: Date): Date => {
@@ -244,7 +250,9 @@ export const calculateNextTrigger = (alarm: Alarm, from: Date = new Date()): Dat
         : null;
     case RepeatMode.Periodic: {
       if (target <= from) {
-        target.setDate(target.getDate() + Math.max(1, alarm.periodicIntervalDays));
+        target.setDate(
+          target.getDate() + Math.max(1, alarm.periodicIntervalDays)
+        );
       }
       return isValidFutureDate(target, from) ? target : null;
     }
@@ -253,7 +261,11 @@ export const calculateNextTrigger = (alarm: Alarm, from: Date = new Date()): Dat
   }
 };
 
-const findNextDayInSet = (target: Date, now: Date, validDays: number[]): Date | null => {
+const findNextDayInSet = (
+  target: Date,
+  now: Date,
+  validDays: number[]
+): Date | null => {
   for (let offset = 0; offset <= 7; offset++) {
     const candidate = new Date(target);
     candidate.setDate(target.getDate() + offset);
@@ -264,7 +276,10 @@ const findNextDayInSet = (target: Date, now: Date, validDays: number[]): Date | 
   return null;
 };
 
-const nextOccurrenceOfDay = (dayOfWeek: number, time: AlarmTime): Date | null => {
+const nextOccurrenceOfDay = (
+  dayOfWeek: number,
+  time: AlarmTime
+): Date | null => {
   const now = new Date();
   const target = new Date(now);
   target.setHours(time.hour, time.minute, time.second, 0);
@@ -294,7 +309,10 @@ export const getTimeUntilAlarm = (alarm: Alarm): string | null => {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 };
 
-export const generateMathChallenge = (): { question: string; answer: number } => {
+export const generateMathChallenge = (): {
+  question: string;
+  answer: number;
+} => {
   const a = Math.floor(Math.random() * 40) + 12;
   const b = Math.floor(Math.random() * 30) + 5;
   const operations = [
@@ -315,9 +333,13 @@ export const generateMemoryPattern = (len = 4): number[] => {
   return pattern;
 };
 
-export const computeComplianceRate = (entries: readonly AlarmHistoryEntry[]): number => {
+export const computeComplianceRate = (
+  entries: readonly AlarmHistoryEntry[]
+): number => {
   if (entries.length === 0) return 100;
-  const onTime = entries.filter(e => e.status === AlarmHistoryStatus.OnTime).length;
+  const onTime = entries.filter(
+    (e) => e.status === AlarmHistoryStatus.OnTime
+  ).length;
   return Math.round((onTime / entries.length) * 100);
 };
 
@@ -328,11 +350,18 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 const isAlarmTime = (v: unknown): v is AlarmTime =>
   isRecord(v) &&
-  typeof v.hour === 'number' && v.hour >= 0 && v.hour <= 23 &&
-  typeof v.minute === 'number' && v.minute >= 0 && v.minute <= 59 &&
-  typeof v.second === 'number' && v.second >= 0 && v.second <= 59;
+  typeof v.hour === 'number' &&
+  v.hour >= 0 &&
+  v.hour <= 23 &&
+  typeof v.minute === 'number' &&
+  v.minute >= 0 &&
+  v.minute <= 59 &&
+  typeof v.second === 'number' &&
+  v.second >= 0 &&
+  v.second <= 59;
 
-const enumValues = <T extends Record<string, string>>(e: T): string[] => Object.values(e);
+const enumValues = <T extends Record<string, string>>(e: T): string[] =>
+  Object.values(e);
 
 export const repairAlarm = (raw: unknown): Alarm | null => {
   if (!isRecord(raw)) return null;
@@ -353,12 +382,17 @@ export const repairAlarm = (raw: unknown): Alarm | null => {
         )
       : [...d.customDays],
     periodicIntervalDays:
-      typeof raw.periodicIntervalDays === 'number' && raw.periodicIntervalDays >= 1
+      typeof raw.periodicIntervalDays === 'number' &&
+      raw.periodicIntervalDays >= 1
         ? raw.periodicIntervalDays
         : d.periodicIntervalDays,
-    snoozeEnabled: typeof raw.snoozeEnabled === 'boolean' ? raw.snoozeEnabled : d.snoozeEnabled,
+    snoozeEnabled:
+      typeof raw.snoozeEnabled === 'boolean'
+        ? raw.snoozeEnabled
+        : d.snoozeEnabled,
     snoozeDurationMinutes:
-      typeof raw.snoozeDurationMinutes === 'number' && raw.snoozeDurationMinutes >= 1
+      typeof raw.snoozeDurationMinutes === 'number' &&
+      raw.snoozeDurationMinutes >= 1
         ? raw.snoozeDurationMinutes
         : d.snoozeDurationMinutes,
     maxSnoozeCount:
@@ -366,24 +400,40 @@ export const repairAlarm = (raw: unknown): Alarm | null => {
         ? raw.maxSnoozeCount
         : d.maxSnoozeCount,
     currentSnoozeCount:
-      typeof raw.currentSnoozeCount === 'number' ? raw.currentSnoozeCount : 0,
-    gradualVolume: typeof raw.gradualVolume === 'boolean' ? raw.gradualVolume : d.gradualVolume,
+      typeof raw.currentSnoozeCount === 'number'
+        ? raw.currentSnoozeCount
+        : 0,
+    gradualVolume:
+      typeof raw.gradualVolume === 'boolean'
+        ? raw.gradualVolume
+        : d.gradualVolume,
     vibrationEnabled:
-      typeof raw.vibrationEnabled === 'boolean' ? raw.vibrationEnabled : d.vibrationEnabled,
+      typeof raw.vibrationEnabled === 'boolean'
+        ? raw.vibrationEnabled
+        : d.vibrationEnabled,
     vibrationPattern: Array.isArray(raw.vibrationPattern)
-      ? (raw.vibrationPattern as unknown[]).filter((x): x is number => typeof x === 'number')
+      ? (raw.vibrationPattern as unknown[]).filter(
+          (x): x is number => typeof x === 'number'
+        )
       : [...d.vibrationPattern],
-    dismissChallenge: enumValues(DismissChallenge).includes(raw.dismissChallenge as string)
+    dismissChallenge: enumValues(DismissChallenge).includes(
+      raw.dismissChallenge as string
+    )
       ? (raw.dismissChallenge as DismissChallenge)
       : d.dismissChallenge,
-    soundName: typeof raw.soundName === 'string' ? raw.soundName : d.soundName,
+    soundName:
+      typeof raw.soundName === 'string' ? raw.soundName : d.soundName,
     volume:
       typeof raw.volume === 'number' ? clamp(raw.volume, 0, 1) : d.volume,
     notificationIds: Array.isArray(raw.notificationIds)
-      ? (raw.notificationIds as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0)
+      ? (raw.notificationIds as unknown[]).filter(
+          (x): x is string => typeof x === 'string' && x.length > 0
+        )
       : [],
-    createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
-    updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now(),
+    createdAt:
+      typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
+    updatedAt:
+      typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now(),
     sortOrder: typeof raw.sortOrder === 'number' ? raw.sortOrder : 0,
   };
 };
@@ -392,7 +442,7 @@ export const validateAlarms = (raw: unknown): Alarm[] => {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
   return raw
-    .map(item => repairAlarm(item))
+    .map((item) => repairAlarm(item))
     .filter((a): a is Alarm => {
       if (!a || seen.has(a.id)) return false;
       seen.add(a.id);
@@ -501,7 +551,9 @@ export class StorageServiceImpl implements IStorageService {
     try {
       return JSON.parse(raw) as T;
     } catch {
-      console.warn('[Storage] JSON parse failed, discarding corrupted data');
+      console.warn(
+        '[Storage] JSON parse failed, discarding corrupted data'
+      );
       return null;
     }
   }
@@ -511,12 +563,16 @@ export class StorageServiceImpl implements IStorageService {
     this.migrated = true;
 
     try {
-      const versionRaw = await AsyncStorage.getItem(STORAGE_KEYS.SCHEMA_VERSION);
+      const versionRaw = await AsyncStorage.getItem(
+        STORAGE_KEYS.SCHEMA_VERSION
+      );
       const version = versionRaw ? parseInt(versionRaw, 10) : 0;
 
       if (version < CURRENT_SCHEMA_VERSION) {
         for (const [logicalKey, legacyKey] of Object.entries(LEGACY_KEYS)) {
-          const newKey = (STORAGE_KEYS as Record<string, string>)[logicalKey];
+          const newKey = (STORAGE_KEYS as Record<string, string>)[
+            logicalKey
+          ];
           if (!newKey) continue;
 
           const existingNew = await AsyncStorage.getItem(newKey);
@@ -546,10 +602,15 @@ export class NotificationServiceImpl implements INotificationService {
 
   async requestPermissions(): Promise<boolean> {
     try {
-      const { status: existing } = await Notifications.getPermissionsAsync();
+      const { status: existing } =
+        await Notifications.getPermissionsAsync();
       if (existing === 'granted') return true;
       const { status } = await Notifications.requestPermissionsAsync({
-        ios: { allowAlert: true, allowSound: true, allowBadge: true },
+        ios: {
+          allowAlert: true,
+          allowSound: true,
+          allowBadge: true,
+        },
         android: { allowAlert: true },
       });
       return status === 'granted';
@@ -567,7 +628,8 @@ export class NotificationServiceImpl implements INotificationService {
         importance: Notifications.AndroidImportance.MAX,
         sound: 'default',
         enableVibrate: true,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        lockscreenVisibility:
+          Notifications.AndroidNotificationVisibility.PUBLIC,
       });
       this.channelConfigured = true;
     } catch (err) {
@@ -580,23 +642,33 @@ export class NotificationServiceImpl implements INotificationService {
       await this.ensureChannel();
 
       // Validate triggerDate is a proper Date instance
-      if (!(triggerDate instanceof Date) || isNaN(triggerDate.getTime())) {
-        console.warn(`[Notifications] Invalid trigger date for alarm ${alarm.id}`);
+      if (
+        !(triggerDate instanceof Date) ||
+        isNaN(triggerDate.getTime())
+      ) {
+        console.warn(
+          `[Notifications] Invalid trigger date for alarm ${alarm.id}`
+        );
         return '';
       }
 
-      // Ensure trigger is in the future with at least 3s buffer
+      // Ensure trigger is in the future with at least 3 s buffer
       if (triggerDate.getTime() <= Date.now() + 3000) {
-        console.warn(`[Notifications] Trigger date is in the past for alarm ${alarm.id}`);
+        console.warn(
+          `[Notifications] Trigger date is in the past for alarm ${alarm.id}`
+        );
         return '';
       }
 
       // Guard: Android has a limit of ~64 pending notifications
       if (Platform.OS === 'android') {
         try {
-          const pending = await Notifications.getAllScheduledNotificationsAsync();
+          const pending =
+            await Notifications.getAllScheduledNotificationsAsync();
           if (pending.length >= 60) {
-            console.warn('[Notifications] Approaching Android notification limit, skipping');
+            console.warn(
+              '[Notifications] Approaching Android notification limit, skipping'
+            );
             return '';
           }
         } catch {
@@ -611,7 +683,9 @@ export class NotificationServiceImpl implements INotificationService {
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,
           data: { alarmId: alarm.id, type: 'alarm' },
-          ...(Platform.OS === 'android' ? { channelId: 'alarms' } : {}),
+          ...(Platform.OS === 'android'
+            ? { channelId: 'alarms' }
+            : {}),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -621,7 +695,10 @@ export class NotificationServiceImpl implements INotificationService {
 
       return id;
     } catch (err) {
-      console.error(`[Notifications] schedule failed for alarm ${alarm.id}`, err);
+      console.error(
+        `[Notifications] schedule failed for alarm ${alarm.id}`,
+        err
+      );
       return '';
     }
   }
@@ -629,9 +706,11 @@ export class NotificationServiceImpl implements INotificationService {
   async cancel(notificationId: string): Promise<void> {
     if (!notificationId) return;
     try {
-      await Notifications.cancelScheduledNotificationAsync(notificationId);
+      await Notifications.cancelScheduledNotificationAsync(
+        notificationId
+      );
     } catch {
-      // Already fired or cancelled
+      // Already fired or cancelled — safe to ignore
     }
   }
 
@@ -651,10 +730,15 @@ export class SoundServiceImpl implements ISoundService {
   private _playing = false;
   private _locked = false;
   private volumeTimer: ReturnType<typeof setInterval> | null = null;
+  private vibrationTimer: ReturnType<typeof setInterval> | null = null;
+
+  // ── Public readonly accessor ──────────────────────────────────────────
 
   get playing(): boolean {
     return this._playing;
   }
+
+  // ── play() — starts alarm sound with optional gradual volume ramp ─────
 
   async play(volume: number, gradual: boolean): Promise<void> {
     // Prevent concurrent play() calls from racing
@@ -663,48 +747,53 @@ export class SoundServiceImpl implements ISoundService {
 
     try {
       // Tear down any previous playback before starting a new one
-      await this.stop();
+      await this.internalStop();
 
       // Guard: ensure volume is a sane finite number
-      if (!volume || volume <= 0 || !Number.isFinite(volume)) {
+      if (!Number.isFinite(volume) || volume <= 0) {
         volume = 0.5;
       }
       volume = clamp(volume, 0, 1);
 
-      // Configure audio session for alarm-style playback
+      // Configure audio session for alarm-style playback:
+      //  - playsInSilentModeIOS: sound works even in silent mode
+      //  - staysActiveInBackground: sound continues in background
+      //  - shouldDuckAndroid: do NOT lower volume for other apps
       try {
         await AudioModule.setAudioModeAsync({
-  playsInSilentModeIOS: true,
-  staysActiveInBackground: true,
-  shouldDuckAndroid: false,
-  interruptionModeAndroid: 'doNotMix',
-});
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          shouldDuckAndroid: false,
+        });
       } catch {
         // Non-critical: continue even if audio mode configuration fails
       }
 
-      const initialVolume = gradual ? Math.max(0.1, volume * 0.2) : volume;
+      const initialVolume = gradual
+        ? Math.max(0.1, volume * 0.2)
+        : volume;
 
       // Load the bundled alarm asset
       let source: number;
       try {
         source = require('./assets/alarm.wav');
       } catch {
-        console.warn('[Sound] Alarm sound asset missing, falling back to vibration');
+        console.warn(
+          '[Sound] Alarm sound asset missing, falling back to vibration'
+        );
         await this.vibrate();
         return;
       }
 
-    // Create a new AudioPlayer instance with the alarm source
-const player = AudioModule.createAudioPlayer(source);
+      // Create a new AudioPlayer instance with the alarm source
+      const player = AudioModule.createAudioPlayer(source);
+      player.loop = true;
+      player.volume = initialVolume;
 
-player.loop = true;
-player.volume = initialVolume;
+      this.player = player;
+      this._playing = true;
 
-this.player = player;
-this._playing = true;
-
-player.play();
+      player.play();
 
       // Gradually ramp volume from initialVolume → targetVolume over ~30 s
       if (gradual) {
@@ -716,17 +805,20 @@ player.play();
           current = Math.min(current + step, targetVolume);
           try {
             if (this.player) {
-              this.player.volume = current;
+              this.player.volume = clamp(current, 0, 1);
             }
           } catch {
             this.clearVolumeTimer();
           }
-          if (current >= targetVolume) this.clearVolumeTimer();
+          if (current >= targetVolume) {
+            this.clearVolumeTimer();
+          }
         }, 1000);
       }
     } catch (err) {
       console.error('[Sound] play failed', err);
       this._playing = false;
+
       // Fallback: vibrate so the alarm is not completely silent
       try {
         await this.vibrate();
@@ -738,54 +830,84 @@ player.play();
     }
   }
 
+  // ── stop() — public: stops sound, vibration, clears all resources ─────
+
   async stop(): Promise<void> {
-    // Always clear the volume ramp timer first
-    this.clearVolumeTimer();
-
-    // Capture and null-out the reference atomically so concurrent
-    // stop() calls don't double-dispose the same player
-    const ref = this.player;
-
-if (!ref) {
-  this._playing = false;
-  return;
-}
-
-// Cut the reference immediately to prevent any simultaneous use
-this.player = null;
-this._playing = false;
-
-try {
-  if (!ref.paused) {
-    ref.pause();
+    await this.internalStop();
   }
-} catch {}
 
-// Releasing resources from memory
-try {
-  ref.remove();
-} catch {}
+  // ── vibrate() — starts a looping vibration pattern every 1200 ms ──────
 
-async vibrate(): Promise<void> {
-  try {
-    if (this.vibrationTimer) return;
+  async vibrate(): Promise<void> {
+    try {
+      // Prevent multiple vibration loops from running simultaneously
+      if (this.vibrationTimer) return;
 
-    this.vibrationTimer = setInterval(() => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    }, 1200);
-  } catch {
-    // Device may not support haptics
+      // Trigger an immediate vibration so the user feels it right away
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Warning
+      );
+
+      // Start the recurring vibration loop
+      this.vibrationTimer = setInterval(() => {
+        Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Warning
+        ).catch(() => {});
+      }, 1200);
+    } catch {
+      // Device may not support haptics — silently ignore
+    }
   }
-}
+
+  // ── dispose() — synchronous cleanup entry point ───────────────────────
 
   dispose(): void {
-    this.stop().catch(() => {});
+    this.internalStop().catch(() => {});
   }
+
+  // ── Private: internalStop() — the single source of truth for cleanup ──
+
+  private async internalStop(): Promise<void> {
+    // 1. Clear all timers first to prevent any further callbacks
+    this.clearVolumeTimer();
+    this.clearVibrationTimer();
+
+    // 2. Capture and null-out the player reference atomically so
+    //    concurrent calls don't double-dispose the same player
+    const ref = this.player;
+    this.player = null;
+    this._playing = false;
+
+    if (!ref) return;
+
+    // 3. Pause playback
+    try {
+      ref.pause();
+    } catch {
+      // Player may already be stopped or in an invalid state
+    }
+
+    // 4. Release native resources from memory
+    try {
+      ref.remove();
+    } catch {
+      // Already disposed — safe to ignore
+    }
+  }
+
+  // ── Private: timer helpers ────────────────────────────────────────────
 
   private clearVolumeTimer(): void {
     if (this.volumeTimer !== null) {
       clearInterval(this.volumeTimer);
       this.volumeTimer = null;
+    }
+  }
+
+  private clearVibrationTimer(): void {
+    if (this.vibrationTimer !== null) {
+      clearInterval(this.vibrationTimer);
+      this.vibrationTimer = null;
     }
   }
 }
@@ -813,9 +935,11 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
     if (!cleared.enabled) return cleared;
 
     const ids: string[] = [];
-    const now = new Date();
 
-    if (cleared.repeatMode === RepeatMode.Custom && cleared.customDays.length > 0) {
+    if (
+      cleared.repeatMode === RepeatMode.Custom &&
+      cleared.customDays.length > 0
+    ) {
       // Schedule one notification per custom day
       for (const day of cleared.customDays) {
         const d = nextOccurrenceOfDay(day, cleared.time);
@@ -832,15 +956,23 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
       }
     }
 
-    return { ...cleared, notificationIds: ids, updatedAt: Date.now() };
+    return {
+      ...cleared,
+      notificationIds: ids,
+      updatedAt: Date.now(),
+    };
   }
 
   async cancelAlarm(alarm: Alarm): Promise<Alarm> {
-    const notifIds = Array.isArray(alarm.notificationIds) ? alarm.notificationIds : [];
+    const notifIds = Array.isArray(alarm.notificationIds)
+      ? alarm.notificationIds
+      : [];
     const validIds = notifIds.filter(
       (id): id is string => typeof id === 'string' && id.length > 0
     );
-    await Promise.allSettled(validIds.map(id => this.notifications.cancel(id)));
+    await Promise.allSettled(
+      validIds.map((id) => this.notifications.cancel(id))
+    );
     return { ...alarm, notificationIds: [], updatedAt: Date.now() };
   }
 
@@ -866,7 +998,10 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
         totalScheduled += updated.notificationIds.length;
         results.push(updated);
       } catch (err) {
-        console.error(`[Scheduler] reschedule failed for alarm ${alarm.id}`, err);
+        console.error(
+          `[Scheduler] reschedule failed for alarm ${alarm.id}`,
+          err
+        );
         results.push(alarm);
       }
     }
@@ -874,13 +1009,17 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
   }
 
   async snoozeAlarm(alarm: Alarm): Promise<Alarm> {
-    if (!alarm.snoozeEnabled || alarm.currentSnoozeCount >= alarm.maxSnoozeCount) {
+    if (
+      !alarm.snoozeEnabled ||
+      alarm.currentSnoozeCount >= alarm.maxSnoozeCount
+    ) {
       return alarm;
     }
 
     await this.sound.stop();
 
-    const snoozeMs = Math.max(1, alarm.snoozeDurationMinutes) * 60_000;
+    const snoozeMs =
+      Math.max(1, alarm.snoozeDurationMinutes) * 60_000;
     const snoozeAt = new Date(Date.now() + snoozeMs);
 
     if (snoozeAt.getTime() <= Date.now() + 3000) return alarm;
@@ -930,7 +1069,11 @@ export class ServiceContainer {
     c._storage = storage;
     c._notifications = notifications;
     c._sound = sound;
-    c._scheduler = new SchedulerEngineImpl(notifications, storage, sound);
+    c._scheduler = new SchedulerEngineImpl(
+      notifications,
+      storage,
+      sound
+    );
     c._ready = true;
     return c;
   }
@@ -940,50 +1083,70 @@ export class ServiceContainer {
   }
 
   async initialize(): Promise<void> {
+    // Already fully initialized — nothing to do
     if (this._ready) return;
+
+    // Another call is already in-flight — wait for the same promise
+    // to avoid creating duplicate service instances
     if (this._initPromise) return this._initPromise;
 
     this._initPromise = (async () => {
-      const storage = new StorageServiceImpl();
-      const notifications = new NotificationServiceImpl();
-      const sound = new SoundServiceImpl();
-      const scheduler = new SchedulerEngineImpl(notifications, storage, sound);
+      try {
+        const storage = new StorageServiceImpl();
+        const notifications = new NotificationServiceImpl();
+        const sound = new SoundServiceImpl();
+        const scheduler = new SchedulerEngineImpl(
+          notifications,
+          storage,
+          sound
+        );
 
-      this._storage = storage;
-      this._notifications = notifications;
-      this._sound = sound;
-      this._scheduler = scheduler;
+        this._storage = storage;
+        this._notifications = notifications;
+        this._sound = sound;
+        this._scheduler = scheduler;
 
-      await notifications.requestPermissions();
-      this._ready = true;
+        // Request notification permissions (non-blocking if denied)
+        await notifications.requestPermissions();
+
+        this._ready = true;
+      } catch (err) {
+        // Reset the promise so a subsequent call can retry
+        this._initPromise = null;
+        console.error(
+          '[ServiceContainer] initialization failed',
+          err
+        );
+        throw err;
+      }
     })();
 
-    try {
-      await this._initPromise;
-    } catch (err) {
-      this._initPromise = null;
-      console.error('[ServiceContainer] initialization failed', err);
-      throw err;
-    }
+    await this._initPromise;
   }
 
   get storage(): IStorageService {
-    if (!this._storage) throw new Error('ServiceContainer not initialized: storage');
+    if (!this._storage)
+      throw new Error('ServiceContainer not initialized: storage');
     return this._storage;
   }
 
   get notifications(): INotificationService {
-    if (!this._notifications) throw new Error('ServiceContainer not initialized: notifications');
+    if (!this._notifications)
+      throw new Error(
+        'ServiceContainer not initialized: notifications'
+      );
     return this._notifications;
   }
 
   get sound(): ISoundService {
-    if (!this._sound) throw new Error('ServiceContainer not initialized: sound');
+    if (!this._sound)
+      throw new Error('ServiceContainer not initialized: sound');
     return this._sound;
   }
 
   get scheduler(): ISchedulerEngine {
-    if (!this._scheduler) throw new Error('ServiceContainer not initialized: scheduler');
+    if (!this._scheduler)
+      throw new Error('ServiceContainer not initialized: scheduler');
     return this._scheduler;
   }
 }
@@ -1001,11 +1164,17 @@ export const registerBackgroundTask = async (): Promise<void> => {
         try {
           const container = ServiceContainer.instance;
           if (!container.ready) await container.initialize();
-          const raw = await container.storage.load<unknown>(STORAGE_KEYS.ALARMS);
+          const raw = await container.storage.load<unknown>(
+            STORAGE_KEYS.ALARMS
+          );
           const alarms = validateAlarms(raw ?? []);
           if (alarms.length > 0) {
-            const updated = await container.scheduler.rescheduleAll(alarms);
-            await container.storage.save(STORAGE_KEYS.ALARMS, updated);
+            const updated =
+              await container.scheduler.rescheduleAll(alarms);
+            await container.storage.save(
+              STORAGE_KEYS.ALARMS,
+              updated
+            );
           }
           return BackgroundTask.BackgroundTaskResult.NewData;
         } catch {
@@ -1014,8 +1183,9 @@ export const registerBackgroundTask = async (): Promise<void> => {
       });
     }
 
-    const registered = await TaskManager.getRegisteredTasksAsync();
-    if (!registered.some(t => t.taskName === BG_TASK)) {
+    const registered =
+      await TaskManager.getRegisteredTasksAsync();
+    if (!registered.some((t) => t.taskName === BG_TASK)) {
       await BackgroundTask.registerTaskAsync(BG_TASK, {
         minimumInterval: 15 * 60,
       });
@@ -1030,7 +1200,9 @@ export const performBootRecovery = async (): Promise<Alarm[]> => {
     const container = ServiceContainer.instance;
     if (!container.ready) await container.initialize();
 
-    const raw = await container.storage.load<unknown>(STORAGE_KEYS.ALARMS);
+    const raw = await container.storage.load<unknown>(
+      STORAGE_KEYS.ALARMS
+    );
     const alarms = validateAlarms(raw ?? []);
     if (alarms.length === 0) return [];
 
@@ -1062,9 +1234,14 @@ export const recordAlarmEvent = async (
       status,
       snoozeCount,
     };
-    const raw = await container.storage.load<unknown>(STORAGE_KEYS.HISTORY);
+    const raw = await container.storage.load<unknown>(
+      STORAGE_KEYS.HISTORY
+    );
     const history = validateHistoryEntries(raw);
-    await container.storage.save(STORAGE_KEYS.HISTORY, [entry, ...history].slice(0, 500));
+    await container.storage.save(
+      STORAGE_KEYS.HISTORY,
+      [entry, ...history].slice(0, 500)
+    );
   } catch (err) {
     console.error('[recordAlarmEvent] failed', err);
   }
