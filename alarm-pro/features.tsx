@@ -791,15 +791,21 @@ const WheelPicker = memo(({
     }
   }, [range]);
 
-  // Settle value after scroll ends
-  const settleValue = useCallback((y: number) => {
-    const idx = Math.round(y / WHEEL_ITEM_H);
-    const clamped = Math.max(0, Math.min(range - 1, idx));
-    if (clamped !== currentValueRef.current) {
-      currentValueRef.current = clamped;
-      onChange(clamped);
-    }
-  }, [range, onChange]);
+// Settle value after scroll ends
+const settleValue = useCallback((y: number) => {
+  const idx = Math.floor((y + WHEEL_ITEM_H / 2) / WHEEL_ITEM_H);
+  const clamped = Math.max(0, Math.min(range - 1, idx));
+
+  if (clamped !== currentValueRef.current) {
+    currentValueRef.current = clamped;
+
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+
+    onChange(clamped);
+  }
+}, [range, onChange]);
 
   const onMomentumEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     settleValue(e.nativeEvent.contentOffset.y);
@@ -823,6 +829,7 @@ const WheelPicker = memo(({
   snapToInterval={WHEEL_ITEM_H}
   snapToAlignment="center"
   decelerationRate="fast"
+  disableIntervalMomentum
 
   showsVerticalScrollIndicator={false}
   scrollEnabled={true}
@@ -835,7 +842,7 @@ const WheelPicker = memo(({
 
   contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
 
-  removeClippedSubviews={false}
+  removeClippedSubviews={true}
 initialNumToRender={5}
 windowSize={5}
 maxToRenderPerBatch={5}
@@ -1057,7 +1064,9 @@ export const AlarmEditorModal = memo(({
         </View>
 
         <ScrollView
-  scrollEnabled={false}
+  nestedScrollEnabled
+  keyboardShouldPersistTaps="handled"
+  showsVerticalScrollIndicator={false}
   contentContainerStyle={{ padding: t.spacing(2), paddingBottom: 120 }}
 >
           {/* Time Picker */}
