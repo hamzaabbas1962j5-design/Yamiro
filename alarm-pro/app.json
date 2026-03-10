@@ -4,13 +4,12 @@
     "slug": "alarm-pro",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "alarmpro",
     "userInterfaceStyle": "dark",
 
     "icon": "./assets/icon.png",
 
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splashicon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0E1A"
     },
@@ -19,47 +18,40 @@
       "**/*"
     ],
 
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.alarmpro.app",
-      "infoPlist": {
-        "UIBackgroundModes": [
-          "fetch",
-          "processing"
-        ]
-      }
+    "scheme": "alarmpro",
+
+    "plugins": [
+      "expo-router",
+      "expo-notifications"
+    ],
+
+    "experiments": {
+      "typedRoutes": true
     },
 
     "android": {
       "package": "com.alarmpro.app",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0A0E1A"
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png"
       },
       "permissions": [
-        "VIBRATE",
         "RECEIVE_BOOT_COMPLETED",
-        "USE_EXACT_ALARM",
-        "SCHEDULE_EXACT_ALARM"
+        "VIBRATE",
+        "WAKE_LOCK"
       ]
     },
 
-    "plugins": [
-      "expo-notifications"
-    ],
+    "ios": {
+      "bundleIdentifier": "com.alarmpro.app",
+      "supportsTablet": true
+    },
 
     "extra": {
       "eas": {
-        "projectId": "auto"
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
       }
-    },
-
-    "updates": {
-      "fallbackToCacheTimeout": 0
-    },
-
-    "runtimeVersion": {
-      "policy": "appVersion"
     }
   }
 }
