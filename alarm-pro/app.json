@@ -18,28 +18,19 @@
       "**/*"
     ],
 
-    "scheme": "alarmpro",
-
-    "plugins": [
-      "expo-router",
-      "expo-notifications"
-    ],
-
-    "experiments": {
-      "typedRoutes": true
-    },
-
     "android": {
       "package": "com.alarmpro.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png"
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
         "VIBRATE",
-        "WAKE_LOCK"
+        "SCHEDULE_EXACT_ALARM"
       ]
     },
 
@@ -48,10 +39,18 @@
       "supportsTablet": true
     },
 
-    "extra": {
-      "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
-      }
-    }
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0A0E1A"
+        }
+      ]
+    ]
   }
 }
