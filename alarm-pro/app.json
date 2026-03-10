@@ -1,62 +1,65 @@
 {
   "expo": {
-    "name": "alarm-pro",
+    "name": "Alarm Pro",
     "slug": "alarm-pro",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/Illustration.png",
+    "scheme": "alarmpro",
     "userInterfaceStyle": "dark",
-    "plugins": [
-      "expo-notifications",
-      "expo-audio",
-      "expo-background-task",
-      "expo-font",
-      "expo-asset"
-    ],
+
+    "icon": "./assets/icon.png",
+
     "splash": {
-      "image": "./assets/splashicon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0E1A"
     },
+
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.alarmpro.app",
       "infoPlist": {
         "UIBackgroundModes": [
-          "audio",
           "fetch",
-          "remote-notification"
+          "processing"
         ]
       }
     },
+
     "android": {
-      "permissions": [
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE",
-        "WAKE_LOCK",
-        "SCHEDULE_EXACT_ALARM",
-        "USE_EXACT_ALARM",
-        "POST_NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
-      ],
+      "package": "com.alarmpro.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0A0E1A",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0E1A"
       },
-      "predictiveBackGestureEnabled": false,
-      "package": "com.hako5.alarmpro"
+      "permissions": [
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "USE_EXACT_ALARM",
+        "SCHEDULE_EXACT_ALARM"
+      ]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
+
+    "plugins": [
+      "expo-notifications"
+    ],
+
     "extra": {
       "eas": {
-        "projectId": "55fb7024-dfdc-4d57-90b1-b1e7c3bf2513"
+        "projectId": "auto"
       }
+    },
+
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }
