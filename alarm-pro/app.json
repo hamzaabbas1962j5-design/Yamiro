@@ -5,19 +5,15 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-
     "icon": "./assets/icon.png",
-
     "splash": {
       "image": "./assets/splashicon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0E1A"
     },
-
     "assetBundlePatterns": [
       "**/*"
     ],
-
     "android": {
       "package": "com.alarmpro.app",
       "versionCode": 1,
@@ -33,16 +29,13 @@
         "SCHEDULE_EXACT_ALARM"
       ]
     },
-
     "ios": {
       "bundleIdentifier": "com.alarmpro.app",
       "supportsTablet": true
     },
-
     "web": {
       "favicon": "./assets/favicon.png"
     },
-
     "plugins": [
       [
         "expo-notifications",
@@ -51,6 +44,11 @@
           "color": "#0A0E1A"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "55fb7024-dfdc-4d57-90b1-b1e7c3bf2513"
+      }
+    }
   }
 }
