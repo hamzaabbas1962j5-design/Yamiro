@@ -126,6 +126,11 @@ let _idCounter = 0;
 export const generateId = (): string =>
   `${Date.now()}_${(++_idCounter).toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
+// ── Scheduling Buffer ────────────────────────────────────────────────────
+// Minimum milliseconds in the future a notification must be to be scheduled.
+// Reduced from 3 000 → 1 000 to improve trigger-time accuracy.
+const MIN_SCHEDULE_BUFFER_MS = 1000;
+
 // ── Factory Functions ────────────────────────────────────────────────────
 
 export const createDefaultAlarm = (overrides?: Partial<Mutable<Alarm>>): Alarm => ({
@@ -560,7 +565,6 @@ export class StorageServiceImpl implements IStorageService {
 
   private async migrateIfNeeded(): Promise<void> {
     if (this.migrated) return;
-    this.migrated = true;
 
     try {
       const versionRaw = await AsyncStorage.getItem(
@@ -589,8 +593,12 @@ export class StorageServiceImpl implements IStorageService {
           CURRENT_SCHEMA_VERSION.toString()
         );
       }
+
+      // Only mark as migrated after success so failures can retry
+      this.migrated = true;
     } catch (err) {
       console.warn('[Storage] migration check failed', err);
+      // Do NOT set this.migrated — allow retry on next load()
     }
   }
 }
@@ -628,11 +636,13 @@ export class NotificationServiceImpl implements INotificationService {
         importance: Notifications.AndroidImportance.MAX,
         sound: 'default',
         enableVibrate: true,
+        vibrationPattern: [0, 500, 250, 500],
         lockscreenVisibility:
           Notifications.AndroidNotificationVisibility.PUBLIC,
       });
       this.channelConfigured = true;
     } catch (err) {
+      // Do NOT set channelConfigured so it retries on next call
       console.error('[Notifications] ensureChannel failed', err);
     }
   }
@@ -652,8 +662,8 @@ export class NotificationServiceImpl implements INotificationService {
         return '';
       }
 
-      // Ensure trigger is in the future with at least 3 s buffer
-      if (triggerDate.getTime() <= Date.now() + 3000) {
+      // Ensure trigger is in the future with a minimal buffer
+      if (triggerDate.getTime() <= Date.now() + MIN_SCHEDULE_BUFFER_MS) {
         console.warn(
           `[Notifications] Trigger date is in the past for alarm ${alarm.id}`
         );
@@ -755,10 +765,7 @@ export class SoundServiceImpl implements ISoundService {
       }
       volume = clamp(volume, 0, 1);
 
-      // Configure audio session for alarm-style playback:
-      //  - playsInSilentModeIOS: sound works even in silent mode
-      //  - staysActiveInBackground: sound continues in background
-      //  - shouldDuckAndroid: do NOT lower volume for other apps
+      // Configure audio session for alarm-style playback
       try {
         await AudioModule.setAudioModeAsync({
           playsInSilentModeIOS: true,
@@ -943,14 +950,14 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
       // Schedule one notification per custom day
       for (const day of cleared.customDays) {
         const d = nextOccurrenceOfDay(day, cleared.time);
-        if (d && d.getTime() > Date.now() + 3000) {
+        if (d && d.getTime() > Date.now() + MIN_SCHEDULE_BUFFER_MS) {
           const id = await this.notifications.schedule(cleared, d);
           if (id) ids.push(id);
         }
       }
     } else {
       const trigger = calculateNextTrigger(cleared);
-      if (trigger && trigger.getTime() > Date.now() + 3000) {
+      if (trigger && trigger.getTime() > Date.now() + MIN_SCHEDULE_BUFFER_MS) {
         const id = await this.notifications.schedule(cleared, trigger);
         if (id) ids.push(id);
       }
@@ -1022,7 +1029,7 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
       Math.max(1, alarm.snoozeDurationMinutes) * 60_000;
     const snoozeAt = new Date(Date.now() + snoozeMs);
 
-    if (snoozeAt.getTime() <= Date.now() + 3000) return alarm;
+    if (snoozeAt.getTime() <= Date.now() + MIN_SCHEDULE_BUFFER_MS) return alarm;
 
     const snoozedLabel = `${alarm.label} (Snooze ${alarm.currentSnoozeCount + 1})`;
     const id = await this.notifications.schedule(
