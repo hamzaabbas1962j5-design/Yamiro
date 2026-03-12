@@ -49,6 +49,7 @@ import {
   GestureHandlerRootView,
   Swipeable,
   RectButton,
+  FlatList as GHFlatList,
 } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
@@ -709,14 +710,14 @@ const CircularProgress = memo(({
 // ║  WHEEL PICKER                                                        ║
 // ╚═══════════════════════════════════════════════════════════════════════╝
 
-const WHEEL_ITEM_H = 56;
+const WHEEL_ITEM_H = 44;
 const WHEEL_VISIBLE = 5;
 const WHEEL_HEIGHT = WHEEL_ITEM_H * WHEEL_VISIBLE;
 const WHEEL_PAD = WHEEL_ITEM_H * Math.floor(WHEEL_VISIBLE / 2);
 
 const WheelItem = memo(({ num, padZero }: { num: number; padZero: boolean }) => (
   <View style={{ height: WHEEL_ITEM_H, alignItems: 'center', justifyContent: 'center' }}>
-    <Text style={{ fontFamily: MONO, fontSize: 22, color: '#EAEAFF' }}>
+    <Text style={{ fontFamily: MONO, fontSize: 20, color: '#EAEAFF' }}>
       {padZero ? num.toString().padStart(2, '0') : num.toString()}
     </Text>
   </View>
@@ -742,36 +743,48 @@ const WheelPicker = memo(({
 }) => {
   const t = useTheme();
   const data = useMemo(() => Array.from({ length: range }, (_, i) => i), [range]);
-  const flatRef = useRef<FlatList<number>>(null);
+  const flatRef = useRef<any>(null);
   const currentValueRef = useRef(value);
   const lastHapticIdx = useRef(value);
   const scrollSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  useEffect(() => {
-  return () => {
-    if (scrollSettleTimer.current) {
-      clearTimeout(scrollSettleTimer.current);
-    }
-  };
-}, []);
-
   const isMounted = useRef(false);
+  const isUserScrolling = useRef(false);
 
-  // Scroll to initial value on mount
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollSettleTimer.current) {
+        clearTimeout(scrollSettleTimer.current);
+      }
+    };
+  }, []);
+
+  // Scroll to initial value on mount (small delay for layout)
   useEffect(() => {
     if (isMounted.current) return;
     isMounted.current = true;
-    requestAnimationFrame(() => {
-      flatRef.current?.scrollToOffset({ offset: value * WHEEL_ITEM_H, animated: false });
-    });
+    const timer = setTimeout(() => {
+      try {
+        flatRef.current?.scrollToOffset?.({ offset: value * WHEEL_ITEM_H, animated: false });
+      } catch {
+        // Ref may not be ready yet
+      }
+    }, 80);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Scroll when value changes externally
+  // Scroll when value changes externally (not from user scrolling)
   useEffect(() => {
+    if (!isMounted.current) return;
+    if (isUserScrolling.current) return;
     if (currentValueRef.current !== value) {
       currentValueRef.current = value;
-      flatRef.current?.scrollToOffset({ offset: value * WHEEL_ITEM_H, animated: true });
+      try {
+        flatRef.current?.scrollToOffset?.({ offset: value * WHEEL_ITEM_H, animated: true });
+      } catch {
+        // Ref may not be ready
+      }
     }
   }, [value]);
 
@@ -791,73 +804,101 @@ const WheelPicker = memo(({
     }
   }, [range]);
 
-// Settle value after scroll ends
-const settleValue = useCallback((y: number) => {
-  const idx = Math.floor((y + WHEEL_ITEM_H / 2) / WHEEL_ITEM_H);
-  const clamped = Math.max(0, Math.min(range - 1, idx));
+  // Settle value after scroll ends
+  const settleValue = useCallback((y: number) => {
+    const idx = Math.round(y / WHEEL_ITEM_H);
+    const clamped = Math.max(0, Math.min(range - 1, idx));
+    isUserScrolling.current = false;
 
-  if (clamped !== currentValueRef.current) {
-    currentValueRef.current = clamped;
+    if (clamped !== currentValueRef.current) {
+      currentValueRef.current = clamped;
+      Haptics.selectionAsync().catch(() => {});
+      onChange(clamped);
+    }
+  }, [range, onChange]);
 
-    try {
-      Haptics.selectionAsync();
-    } catch {}
-
-    onChange(clamped);
-  }
-}, [range, onChange]);
+  const onScrollBeginDrag = useCallback(() => {
+    isUserScrolling.current = true;
+    if (scrollSettleTimer.current) {
+      clearTimeout(scrollSettleTimer.current);
+      scrollSettleTimer.current = null;
+    }
+  }, []);
 
   const onMomentumEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (scrollSettleTimer.current) {
+      clearTimeout(scrollSettleTimer.current);
+      scrollSettleTimer.current = null;
+    }
     settleValue(e.nativeEvent.contentOffset.y);
   }, [settleValue]);
 
   const onScrollEndDrag = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (scrollSettleTimer.current) clearTimeout(scrollSettleTimer.current);
+    if (scrollSettleTimer.current) {
+      clearTimeout(scrollSettleTimer.current);
+    }
     const y = e.nativeEvent.contentOffset.y;
-    scrollSettleTimer.current = setTimeout(() => settleValue(y), 200);
+    // Fallback: if onMomentumScrollEnd doesn't fire (no momentum),
+    // settle after a short timeout.
+    scrollSettleTimer.current = setTimeout(() => {
+      settleValue(y);
+    }, 150);
   }, [settleValue]);
 
   return (
-    <View style={{ height: WHEEL_HEIGHT, width: 80, overflow: 'hidden' }}>
-      <FlatList
-  ref={flatRef}
-  data={data}
-  keyExtractor={wheelKeyExtractor}
-  renderItem={renderItem}
-  getItemLayout={wheelGetItemLayout}
+    <View
+      style={{
+        height: WHEEL_HEIGHT,
+        width: 64,
+        overflow: 'hidden',
+        borderRadius: 12,
+      }}
+    >
+      {/* GHFlatList from react-native-gesture-handler handles nested scroll
+          properly within a parent ScrollView / GestureHandlerRootView */}
+      <GHFlatList
+        ref={flatRef}
+        data={data}
+        keyExtractor={wheelKeyExtractor}
+        renderItem={renderItem}
+        getItemLayout={wheelGetItemLayout}
 
-  snapToInterval={WHEEL_ITEM_H}
-  snapToAlignment="center"
-  decelerationRate="fast"
-  disableIntervalMomentum
+        snapToInterval={WHEEL_ITEM_H}
+        snapToAlignment="center"
+        decelerationRate="fast"
+        disableIntervalMomentum
 
-  showsVerticalScrollIndicator={false}
-  scrollEnabled={true}
-  bounces={false}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={true}
+        bounces={false}
+        nestedScrollEnabled={true}
+        overScrollMode="never"
 
-  onScroll={onScroll}
-  scrollEventThrottle={16}
-  onMomentumScrollEnd={onMomentumEnd}
-  onScrollEndDrag={onScrollEndDrag}
+        onScrollBeginDrag={onScrollBeginDrag}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={onMomentumEnd}
+        onScrollEndDrag={onScrollEndDrag}
 
-  contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
+        contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
 
-  removeClippedSubviews={true}
-initialNumToRender={5}
-windowSize={5}
-maxToRenderPerBatch={5}
-/>
+        // Pre-render all items (max 60) for instant, jank-free scrolling
+        removeClippedSubviews={false}
+        initialNumToRender={range}
+        windowSize={range + 4}
+        maxToRenderPerBatch={range}
+      />
       {/* Top/Bottom dimming masks + center highlight */}
       <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-        <View style={{ height: WHEEL_PAD, backgroundColor: 'rgba(10,14,26,0.75)' }} />
+        <View style={{ height: WHEEL_PAD, backgroundColor: 'rgba(10,14,26,0.78)' }} />
         <View style={{
           height: WHEEL_ITEM_H,
-          borderTopWidth: 2,
-          borderBottomWidth: 2,
-          borderColor: t.primary + '44',
-          backgroundColor: 'rgba(108,99,255,0.06)',
+          borderTopWidth: 1.5,
+          borderBottomWidth: 1.5,
+          borderColor: 'rgba(108,99,255,0.35)',
+          backgroundColor: 'rgba(108,99,255,0.07)',
         }} />
-        <View style={{ flex: 1, backgroundColor: 'rgba(10,14,26,0.75)' }} />
+        <View style={{ flex: 1, backgroundColor: 'rgba(10,14,26,0.78)' }} />
       </View>
     </View>
   );
@@ -1041,247 +1082,274 @@ export const AlarmEditorModal = memo(({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: t.bg }}>
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: t.spacing(2),
-            paddingTop: t.spacing(6),
-          }}
-        >
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Text style={[typo.body, { color: t.textSecondary }]}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={[typo.h3, { color: t.textPrimary }]}>
-            {existingAlarm ? 'Edit Alarm' : 'New Alarm'}
-          </Text>
-          <TouchableOpacity onPress={handleSave} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Text style={[typo.body, { color: t.primary, fontWeight: '600' }]}>Save</Text>
-          </TouchableOpacity>
-        </View>
+      {/* GestureHandlerRootView is required inside Modal on Android for
+          react-native-gesture-handler components (GHFlatList) to receive
+          touch events properly. Without this the wheel picker becomes
+          unresponsive inside the modal. */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: t.bg }}>
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: t.spacing(2),
+              paddingTop: t.spacing(6),
+            }}
+          >
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={[typo.body, { color: t.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[typo.h3, { color: t.textPrimary }]}>
+              {existingAlarm ? 'Edit Alarm' : 'New Alarm'}
+            </Text>
+            <TouchableOpacity onPress={handleSave} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={[typo.body, { color: t.primary, fontWeight: '600' }]}>Save</Text>
+            </TouchableOpacity>
+          </View>
 
-        <ScrollView
-  nestedScrollEnabled
-  keyboardShouldPersistTaps="handled"
-  showsVerticalScrollIndicator={false}
-  contentContainerStyle={{ padding: t.spacing(2), paddingBottom: 120 }}
->
-          {/* Time Picker */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-              <WheelPicker range={24} value={draft.time.hour} onChange={v => updateTime('hour', v)} />
-              <Text style={[typo.h1, { color: t.primary, marginHorizontal: 4 }]}>:</Text>
-              <WheelPicker range={60} value={draft.time.minute} onChange={v => updateTime('minute', v)} />
-              <Text style={[typo.h1, { color: t.primary, marginHorizontal: 4 }]}>:</Text>
-              <WheelPicker range={60} value={draft.time.second} onChange={v => updateTime('second', v)} />
-            </View>
-          </GlassCard>
+          <ScrollView
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ padding: t.spacing(2), paddingBottom: 120 }}
+          >
+            {/* Time Picker */}
+            <GlassCard style={{ marginBottom: t.spacing(2), paddingVertical: t.spacing(2) }}>
+              <Text style={[typo.caption, { color: t.textSecondary, textAlign: 'center', marginBottom: t.spacing(1.5) }]}>
+                Set Time
+              </Text>
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: t.surface,
+                borderRadius: 16,
+                paddingVertical: t.spacing(1),
+                paddingHorizontal: t.spacing(1.5),
+                marginHorizontal: t.spacing(1),
+              }}>
+                <View style={{ alignItems: 'center' }}>
+                  <WheelPicker range={24} value={draft.time.hour} onChange={v => updateTime('hour', v)} />
+                  <Text style={[typo.caption, { color: t.textMuted, marginTop: 6, fontSize: 10, letterSpacing: 1 }]}>HR</Text>
+                </View>
+                <Text style={[typo.h2, { color: t.primary, marginHorizontal: 6 }]}>:</Text>
+                <View style={{ alignItems: 'center' }}>
+                  <WheelPicker range={60} value={draft.time.minute} onChange={v => updateTime('minute', v)} />
+                  <Text style={[typo.caption, { color: t.textMuted, marginTop: 6, fontSize: 10, letterSpacing: 1 }]}>MIN</Text>
+                </View>
+                <Text style={[typo.h2, { color: t.primary, marginHorizontal: 6 }]}>:</Text>
+                <View style={{ alignItems: 'center' }}>
+                  <WheelPicker range={60} value={draft.time.second} onChange={v => updateTime('second', v)} />
+                  <Text style={[typo.caption, { color: t.textMuted, marginTop: 6, fontSize: 10, letterSpacing: 1 }]}>SEC</Text>
+                </View>
+              </View>
+            </GlassCard>
 
-          {/* Label */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <Text style={[typo.caption, { color: t.textSecondary, marginBottom: 4 }]}>Label</Text>
-            <TextInput
-              value={draft.label}
-              onChangeText={txt => update('label', txt)}
-              placeholderTextColor={t.textMuted}
-              placeholder="Alarm label"
-              style={[
-                typo.body,
-                {
-                  color: t.textPrimary,
-                  backgroundColor: t.surfaceLight,
-                  borderRadius: 12,
-                  padding: t.spacing(1.5),
-                  minHeight: 44,
-                },
-              ]}
-            />
-          </GlassCard>
+            {/* Label */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
+              <Text style={[typo.caption, { color: t.textSecondary, marginBottom: 4 }]}>Label</Text>
+              <TextInput
+                value={draft.label}
+                onChangeText={txt => update('label', txt)}
+                placeholderTextColor={t.textMuted}
+                placeholder="Alarm label"
+                style={[
+                  typo.body,
+                  {
+                    color: t.textPrimary,
+                    backgroundColor: t.surfaceLight,
+                    borderRadius: 12,
+                    padding: t.spacing(1.5),
+                    minHeight: 44,
+                  },
+                ]}
+              />
+            </GlassCard>
 
-          {/* Repeat */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <Text style={[typo.caption, { color: t.textSecondary, marginBottom: 8 }]}>Repeat</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {repeatOptions.map(opt => (
-                <Chip
-                  key={opt.mode}
-                  label={opt.label}
-                  active={draft.repeatMode === opt.mode}
-                  onPress={() => update('repeatMode', opt.mode)}
+            {/* Repeat */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
+              <Text style={[typo.caption, { color: t.textSecondary, marginBottom: 8 }]}>Repeat</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {repeatOptions.map(opt => (
+                  <Chip
+                    key={opt.mode}
+                    label={opt.label}
+                    active={draft.repeatMode === opt.mode}
+                    onPress={() => update('repeatMode', opt.mode)}
+                  />
+                ))}
+              </View>
+              {draft.repeatMode === RepeatMode.Custom && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
+                  {dayLabels.map((label, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => toggleDay(idx)}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: draft.customDays.includes(idx) ? t.primary : t.glassBg,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: draft.customDays.includes(idx) ? t.primary : t.glassBorder,
+                      }}
+                    >
+                      <Text
+                        style={[
+                          typo.caption,
+                          {
+                            color: draft.customDays.includes(idx) ? '#fff' : t.textSecondary,
+                            fontWeight: '600',
+                          },
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              {draft.repeatMode === RepeatMode.Periodic && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                  <Text style={[typo.body, { color: t.textSecondary }]}>Every </Text>
+                  <TextInput
+                    keyboardType="number-pad"
+                    value={draft.periodicIntervalDays.toString()}
+                    onChangeText={txt => {
+                      const n = parseInt(txt, 10);
+                      if (!isNaN(n) && n > 0) update('periodicIntervalDays', n);
+                    }}
+                    style={[
+                      typo.body,
+                      {
+                        color: t.primary,
+                        backgroundColor: t.surfaceLight,
+                        borderRadius: 8,
+                        paddingHorizontal: 12,
+                        paddingVertical: 4,
+                        width: 64,
+                        textAlign: 'center',
+                        minHeight: 40,
+                      },
+                    ]}
+                  />
+                  <Text style={[typo.body, { color: t.textSecondary }]}> day(s)</Text>
+                </View>
+              )}
+            </GlassCard>
+
+            {/* Snooze */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="alarm-outline" size={18} color={t.textSecondary} />
+                  <Text style={[typo.body, { color: t.textPrimary, marginLeft: 8 }]}>Snooze</Text>
+                </View>
+                <Switch
+                  value={draft.snoozeEnabled}
+                  onValueChange={v => update('snoozeEnabled', v)}
+                  trackColor={{ false: t.textMuted, true: t.primaryDim }}
+                  thumbColor={draft.snoozeEnabled ? t.primary : t.textSecondary}
                 />
-              ))}
-            </View>
-            {draft.repeatMode === RepeatMode.Custom && (
-              <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
-                {dayLabels.map((label, idx) => (
+              </View>
+              {draft.snoozeEnabled && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={[typo.caption, { color: t.textSecondary }]}>
+                    Duration: {draft.snoozeDurationMinutes} min · Max: {draft.maxSnoozeCount}x
+                  </Text>
+                  <View style={{ flexDirection: 'row', marginTop: 8, flexWrap: 'wrap' }}>
+                    {[1, 3, 5, 10, 15].map(m => (
+                      <Chip
+                        key={m}
+                        label={`${m}m`}
+                        active={draft.snoozeDurationMinutes === m}
+                        onPress={() => update('snoozeDurationMinutes', m)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
+            </GlassCard>
+
+            {/* Sound & Vibration */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="volume-high-outline" size={18} color={t.textSecondary} />
+                  <Text style={[typo.body, { color: t.textPrimary, marginLeft: 8 }]}>Gradual Volume</Text>
+                </View>
+                <Switch
+                  value={draft.gradualVolume}
+                  onValueChange={v => update('gradualVolume', v)}
+                  trackColor={{ false: t.textMuted, true: t.primaryDim }}
+                  thumbColor={draft.gradualVolume ? t.primary : t.textSecondary}
+                />
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="phone-portrait-outline" size={18} color={t.textSecondary} />
+                  <Text style={[typo.body, { color: t.textPrimary, marginLeft: 8 }]}>Vibration</Text>
+                </View>
+                <Switch
+                  value={draft.vibrationEnabled}
+                  onValueChange={v => update('vibrationEnabled', v)}
+                  trackColor={{ false: t.textMuted, true: t.primaryDim }}
+                  thumbColor={draft.vibrationEnabled ? t.primary : t.textSecondary}
+                />
+              </View>
+            </GlassCard>
+
+            {/* Dismiss Challenge */}
+            <GlassCard style={{ marginBottom: t.spacing(2) }}>
+              <Text style={[typo.caption, { color: t.textSecondary, marginBottom: 8 }]}>
+                Dismiss Challenge
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {challengeOptions.map(opt => (
                   <TouchableOpacity
-                    key={idx}
-                    onPress={() => toggleDay(idx)}
+                    key={opt.ch}
+                    onPress={() => update('dismissChallenge', opt.ch)}
                     style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      backgroundColor: draft.customDays.includes(idx) ? t.primary : t.glassBg,
+                      flexDirection: 'row',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      backgroundColor: draft.dismissChallenge === opt.ch ? t.primaryDim : t.glassBg,
                       borderWidth: 1,
-                      borderColor: draft.customDays.includes(idx) ? t.primary : t.glassBorder,
+                      borderColor: draft.dismissChallenge === opt.ch ? t.primary : t.glassBorder,
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      marginRight: 8,
+                      marginBottom: 8,
+                      minHeight: 44,
                     }}
                   >
+                    <Ionicons
+                      name={opt.icon}
+                      size={16}
+                      color={draft.dismissChallenge === opt.ch ? t.primary : t.textSecondary}
+                    />
                     <Text
                       style={[
                         typo.caption,
                         {
-                          color: draft.customDays.includes(idx) ? '#fff' : t.textSecondary,
-                          fontWeight: '600',
+                          color: draft.dismissChallenge === opt.ch ? t.primary : t.textSecondary,
+                          marginLeft: 6,
                         },
                       ]}
                     >
-                      {label}
+                      {opt.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            )}
-            {draft.repeatMode === RepeatMode.Periodic && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-                <Text style={[typo.body, { color: t.textSecondary }]}>Every </Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  value={draft.periodicIntervalDays.toString()}
-                  onChangeText={txt => {
-                    const n = parseInt(txt, 10);
-                    if (!isNaN(n) && n > 0) update('periodicIntervalDays', n);
-                  }}
-                  style={[
-                    typo.body,
-                    {
-                      color: t.primary,
-                      backgroundColor: t.surfaceLight,
-                      borderRadius: 8,
-                      paddingHorizontal: 12,
-                      paddingVertical: 4,
-                      width: 64,
-                      textAlign: 'center',
-                      minHeight: 40,
-                    },
-                  ]}
-                />
-                <Text style={[typo.body, { color: t.textSecondary }]}> day(s)</Text>
-              </View>
-            )}
-          </GlassCard>
-
-          {/* Snooze */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="alarm-outline" size={18} color={t.textSecondary} />
-                <Text style={[typo.body, { color: t.textPrimary, marginLeft: 8 }]}>Snooze</Text>
-              </View>
-              <Switch
-                value={draft.snoozeEnabled}
-                onValueChange={v => update('snoozeEnabled', v)}
-                trackColor={{ false: t.textMuted, true: t.primaryDim }}
-                thumbColor={draft.snoozeEnabled ? t.primary : t.textSecondary}
-              />
-            </View>
-            {draft.snoozeEnabled && (
-              <View style={{ marginTop: 12 }}>
-                <Text style={[typo.caption, { color: t.textSecondary }]}>
-                  Duration: {draft.snoozeDurationMinutes} min · Max: {draft.maxSnoozeCount}x
-                </Text>
-                <View style={{ flexDirection: 'row', marginTop: 8, flexWrap: 'wrap' }}>
-                  {[1, 3, 5, 10, 15].map(m => (
-                    <Chip
-                      key={m}
-                      label={`${m}m`}
-                      active={draft.snoozeDurationMinutes === m}
-                      onPress={() => update('snoozeDurationMinutes', m)}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-          </GlassCard>
-
-          {/* Sound & Vibration */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="volume-high-outline" size={18} color={t.textSecondary} />
-                <Text style={[typo.body, { color: t.textPrimary, marginLeft: 8 }]}>Gradual Volume</Text>
-              </View>
-              <Switch
-                value={draft.gradualVolume}
-                onValueChange={v => update('gradualVolume', v)}
-                trackColor={{ false: t.textMuted, true: t.primaryDim }}
-                thumbColor={draft.gradualVolume ? t.primary : t.textSecondary}
-              />
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="phone-portrait-outline" size={18} color={t.textSecondary} />
-                <Text style={[typo.body, { color: t.textPrimary, marginLeft: 8 }]}>Vibration</Text>
-              </View>
-              <Switch
-                value={draft.vibrationEnabled}
-                onValueChange={v => update('vibrationEnabled', v)}
-                trackColor={{ false: t.textMuted, true: t.primaryDim }}
-                thumbColor={draft.vibrationEnabled ? t.primary : t.textSecondary}
-              />
-            </View>
-          </GlassCard>
-
-          {/* Dismiss Challenge */}
-          <GlassCard style={{ marginBottom: t.spacing(2) }}>
-            <Text style={[typo.caption, { color: t.textSecondary, marginBottom: 8 }]}>
-              Dismiss Challenge
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {challengeOptions.map(opt => (
-                <TouchableOpacity
-                  key={opt.ch}
-                  onPress={() => update('dismissChallenge', opt.ch)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: draft.dismissChallenge === opt.ch ? t.primaryDim : t.glassBg,
-                    borderWidth: 1,
-                    borderColor: draft.dismissChallenge === opt.ch ? t.primary : t.glassBorder,
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    marginRight: 8,
-                    marginBottom: 8,
-                    minHeight: 44,
-                  }}
-                >
-                  <Ionicons
-                    name={opt.icon}
-                    size={16}
-                    color={draft.dismissChallenge === opt.ch ? t.primary : t.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      typo.caption,
-                      {
-                        color: draft.dismissChallenge === opt.ch ? t.primary : t.textSecondary,
-                        marginLeft: 6,
-                      },
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </GlassCard>
-        </ScrollView>
-      </View>
+            </GlassCard>
+          </ScrollView>
+        </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 });
