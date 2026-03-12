@@ -26,7 +26,13 @@
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK",
         "VIBRATE",
-        "SCHEDULE_EXACT_ALARM"
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "USE_FULL_SCREEN_INTENT",
+        "POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "ios": {
