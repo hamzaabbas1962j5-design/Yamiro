@@ -109,6 +109,32 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
+// ── Helper: find an alarm by id and play sound + vibration ──
+const triggerAlarmAudioAndVibration = async (
+  alarmId: string
+): Promise<Alarm | undefined> => {
+  const container = ServiceContainer.instance;
+  if (!container.ready) return undefined;
+
+  const raw = await container.storage.load<unknown>(STORAGE_KEYS.ALARMS);
+  const alarms = validateAlarms(raw ?? []);
+  const alarm = alarms.find(a => a.id === alarmId);
+
+  // Start sound and vibration concurrently for the fastest possible response.
+  // Previously these were sequential (await play THEN await vibrate) which
+  // delayed vibration by however long it took to initialise the AudioPlayer.
+  const soundPromise = container.sound
+    .play(alarm?.volume ?? 0.8, alarm?.gradualVolume ?? false)
+    .catch(err => console.error('[App] sound.play error:', err));
+
+  if (alarm?.vibrationEnabled !== false) {
+    container.sound.vibrate().catch(() => {});
+  }
+
+  await soundPromise;
+  return alarm;
+};
+
 // ── Navigation ──
 const Tab = createBottomTabNavigator();
 
@@ -168,6 +194,7 @@ export default function App() {
 
   // ── Notification Listeners ──
   useEffect(() => {
+    // Fires when a notification arrives while the app is FOREGROUNDED.
     receivedSub.current = Notifications.addNotificationReceivedListener(async (notification) => {
       try {
         const data = notification.request.content.data as {
@@ -177,25 +204,17 @@ export default function App() {
 
         if (data?.type !== 'alarm' || !data.alarmId) return;
 
-        const container = ServiceContainer.instance;
-        if (!container.ready) return;
+        const alarm = await triggerAlarmAudioAndVibration(data.alarmId);
 
-        const raw = await container.storage.load<unknown>(STORAGE_KEYS.ALARMS);
-const alarms = validateAlarms(raw ?? []);
-const alarm = alarms.find(a => a.id === data.alarmId);
-
-await container.sound.play(alarm?.volume ?? 0.8, alarm?.gradualVolume ?? false);
-await container.sound.vibrate();
-
-if (alarm && alarm.dismissChallenge !== DismissChallenge.None) {
-  setTriggeredAlarmId(alarm.id);
-  setActiveChallenge(alarm.dismissChallenge);
-  setChallengeVisible(true);
-} else {
+        if (alarm && alarm.dismissChallenge !== DismissChallenge.None) {
+          setTriggeredAlarmId(alarm.id);
+          setActiveChallenge(alarm.dismissChallenge);
+          setChallengeVisible(true);
+        } else {
           // Auto-stop sound after 30 seconds if no challenge
           setTimeout(() => {
             try {
-              container.sound.stop();
+              ServiceContainer.instance.sound.stop();
             } catch {
               // Non-critical
             }
@@ -208,21 +227,43 @@ if (alarm && alarm.dismissChallenge !== DismissChallenge.None) {
           AlarmHistoryStatus.OnTime
         );
       } catch (err) {
-        console.error('[App] notification handler error:', err);
+        console.error('[App] notification received handler error:', err);
       }
     });
 
+    // Fires when the user TAPS a notification (app may be bg or killed).
     responseSub.current = Notifications.addNotificationResponseReceivedListener(async (response) => {
       try {
+        const data = response.notification.request.content.data as {
+          alarmId?: string;
+          type?: string;
+        };
+
+        if (data?.type !== 'alarm' || !data.alarmId) return;
+
         const container = ServiceContainer.instance;
         if (!container.ready) return;
 
-        const data = response.notification.request.content.data as { alarmId?: string };
-        if (data?.alarmId) {
-          console.log('[App] Notification tapped for alarm:', data.alarmId);
+        // If sound is already playing (from foreground handler), skip.
+        if (container.sound.playing) return;
+
+        const alarm = await triggerAlarmAudioAndVibration(data.alarmId);
+
+        if (alarm && alarm.dismissChallenge !== DismissChallenge.None) {
+          setTriggeredAlarmId(alarm.id);
+          setActiveChallenge(alarm.dismissChallenge);
+          setChallengeVisible(true);
+        } else {
+          setTimeout(() => {
+            try {
+              container.sound.stop();
+            } catch {
+              // Non-critical
+            }
+          }, 30_000);
         }
-      } catch {
-        // Non-critical
+      } catch (err) {
+        console.error('[App] notification response handler error:', err);
       }
     });
 
