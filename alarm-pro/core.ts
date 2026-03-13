@@ -127,8 +127,6 @@ export const generateId = (): string =>
   `${Date.now()}_${(++_idCounter).toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 // ── Scheduling Buffer ────────────────────────────────────────────────────
-// Minimum milliseconds in the future a notification must be to be scheduled.
-// Reduced from 3 000 → 1 000 to improve trigger-time accuracy.
 const MIN_SCHEDULE_BUFFER_MS = 1000;
 
 // ── Factory Functions ────────────────────────────────────────────────────
@@ -594,11 +592,9 @@ export class StorageServiceImpl implements IStorageService {
         );
       }
 
-      // Only mark as migrated after success so failures can retry
       this.migrated = true;
     } catch (err) {
       console.warn('[Storage] migration check failed', err);
-      // Do NOT set this.migrated — allow retry on next load()
     }
   }
 }
@@ -639,10 +635,10 @@ export class NotificationServiceImpl implements INotificationService {
         vibrationPattern: [0, 500, 250, 500],
         lockscreenVisibility:
           Notifications.AndroidNotificationVisibility.PUBLIC,
+        bypassDnd: true,
       });
       this.channelConfigured = true;
     } catch (err) {
-      // Do NOT set channelConfigured so it retries on next call
       console.error('[Notifications] ensureChannel failed', err);
     }
   }
@@ -651,7 +647,6 @@ export class NotificationServiceImpl implements INotificationService {
     try {
       await this.ensureChannel();
 
-      // Validate triggerDate is a proper Date instance
       if (
         !(triggerDate instanceof Date) ||
         isNaN(triggerDate.getTime())
@@ -662,7 +657,6 @@ export class NotificationServiceImpl implements INotificationService {
         return '';
       }
 
-      // Ensure trigger is in the future with a minimal buffer
       if (triggerDate.getTime() <= Date.now() + MIN_SCHEDULE_BUFFER_MS) {
         console.warn(
           `[Notifications] Trigger date is in the past for alarm ${alarm.id}`
@@ -670,7 +664,6 @@ export class NotificationServiceImpl implements INotificationService {
         return '';
       }
 
-      // Guard: Android has a limit of ~64 pending notifications
       if (Platform.OS === 'android') {
         try {
           const pending =
@@ -733,6 +726,22 @@ export class NotificationServiceImpl implements INotificationService {
   }
 }
 
+// ── Audio Mode Initialization ────────────────────────────────────────────
+// Configures the audio session once at startup so the player is ready
+// before the first alarm fires. Called from ServiceContainer.initialize().
+
+const initAudioMode = async (): Promise<void> => {
+  try {
+    await AudioModule.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+      shouldDuckAndroid: false,
+    });
+  } catch (err) {
+    console.warn('[Audio] initAudioMode failed (non-critical):', err);
+  }
+};
+
 // ── Sound Implementation (expo-audio AudioPlayer API) ────────────────────
 
 export class SoundServiceImpl implements ISoundService {
@@ -742,30 +751,24 @@ export class SoundServiceImpl implements ISoundService {
   private volumeTimer: ReturnType<typeof setInterval> | null = null;
   private vibrationTimer: ReturnType<typeof setInterval> | null = null;
 
-  // ── Public readonly accessor ──────────────────────────────────────────
-
   get playing(): boolean {
     return this._playing;
   }
 
-  // ── play() — starts alarm sound with optional gradual volume ramp ─────
-
   async play(volume: number, gradual: boolean): Promise<void> {
-    // Prevent concurrent play() calls from racing
     if (this._locked) return;
     this._locked = true;
 
     try {
-      // Tear down any previous playback before starting a new one
       await this.internalStop();
 
-      // Guard: ensure volume is a sane finite number
       if (!Number.isFinite(volume) || volume <= 0) {
         volume = 0.5;
       }
       volume = clamp(volume, 0, 1);
 
-      // Configure audio session for alarm-style playback
+      // Re-apply audio mode every time we play to ensure the session
+      // is active even if another app or the OS reclaimed it.
       try {
         await AudioModule.setAudioModeAsync({
           playsInSilentModeIOS: true,
@@ -780,7 +783,6 @@ export class SoundServiceImpl implements ISoundService {
         ? Math.max(0.1, volume * 0.2)
         : volume;
 
-      // Load the bundled alarm asset
       let source: number;
       try {
         source = require('./assets/alarm.wav');
@@ -792,7 +794,6 @@ export class SoundServiceImpl implements ISoundService {
         return;
       }
 
-      // Create a new AudioPlayer instance with the alarm source
       const player = AudioModule.createAudioPlayer(source);
       player.loop = true;
       player.volume = initialVolume;
@@ -802,7 +803,6 @@ export class SoundServiceImpl implements ISoundService {
 
       player.play();
 
-      // Gradually ramp volume from initialVolume → targetVolume over ~30 s
       if (gradual) {
         const targetVolume = volume;
         let current = initialVolume;
@@ -826,7 +826,6 @@ export class SoundServiceImpl implements ISoundService {
       console.error('[Sound] play failed', err);
       this._playing = false;
 
-      // Fallback: vibrate so the alarm is not completely silent
       try {
         await this.vibrate();
       } catch {
@@ -837,25 +836,18 @@ export class SoundServiceImpl implements ISoundService {
     }
   }
 
-  // ── stop() — public: stops sound, vibration, clears all resources ─────
-
   async stop(): Promise<void> {
     await this.internalStop();
   }
 
-  // ── vibrate() — starts a looping vibration pattern every 1200 ms ──────
-
   async vibrate(): Promise<void> {
     try {
-      // Prevent multiple vibration loops from running simultaneously
       if (this.vibrationTimer) return;
 
-      // Trigger an immediate vibration so the user feels it right away
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Warning
       );
 
-      // Start the recurring vibration loop
       this.vibrationTimer = setInterval(() => {
         Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Warning
@@ -866,43 +858,32 @@ export class SoundServiceImpl implements ISoundService {
     }
   }
 
-  // ── dispose() — synchronous cleanup entry point ───────────────────────
-
   dispose(): void {
     this.internalStop().catch(() => {});
   }
 
-  // ── Private: internalStop() — the single source of truth for cleanup ──
-
   private async internalStop(): Promise<void> {
-    // 1. Clear all timers first to prevent any further callbacks
     this.clearVolumeTimer();
     this.clearVibrationTimer();
 
-    // 2. Capture and null-out the player reference atomically so
-    //    concurrent calls don't double-dispose the same player
     const ref = this.player;
     this.player = null;
     this._playing = false;
 
     if (!ref) return;
 
-    // 3. Pause playback
     try {
       ref.pause();
     } catch {
       // Player may already be stopped or in an invalid state
     }
 
-    // 4. Release native resources from memory
     try {
       ref.remove();
     } catch {
       // Already disposed — safe to ignore
     }
   }
-
-  // ── Private: timer helpers ────────────────────────────────────────────
 
   private clearVolumeTimer(): void {
     if (this.volumeTimer !== null) {
@@ -931,13 +912,11 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
   ) {}
 
   async scheduleAlarm(alarm: Alarm): Promise<Alarm> {
-    // Validate alarm id
     if (typeof alarm.id !== 'string' || alarm.id.length === 0) {
       console.warn('[Scheduler] Invalid alarm id, skipping');
       return alarm;
     }
 
-    // Always cancel existing notifications first to prevent duplication
     const cleared = await this.cancelAlarm(alarm);
     if (!cleared.enabled) return cleared;
 
@@ -947,7 +926,6 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
       cleared.repeatMode === RepeatMode.Custom &&
       cleared.customDays.length > 0
     ) {
-      // Schedule one notification per custom day
       for (const day of cleared.customDays) {
         const d = nextOccurrenceOfDay(day, cleared.time);
         if (d && d.getTime() > Date.now() + MIN_SCHEDULE_BUFFER_MS) {
@@ -984,13 +962,11 @@ export class SchedulerEngineImpl implements ISchedulerEngine {
   }
 
   async rescheduleAll(alarms: Alarm[]): Promise<Alarm[]> {
-    // Android allows max ~64 pending notifications; leave room
     const MAX_NOTIFICATIONS = Platform.OS === 'android' ? 60 : 500;
     let totalScheduled = 0;
     const results: Alarm[] = [];
 
     for (const alarm of alarms) {
-      // Skip invalid entries
       if (typeof alarm.id !== 'string' || alarm.id.length === 0) {
         continue;
       }
@@ -1066,7 +1042,6 @@ export class ServiceContainer {
     return this._instance;
   }
 
-  // Allow injection for testing
   static createWithServices(
     storage: IStorageService,
     notifications: INotificationService,
@@ -1090,11 +1065,8 @@ export class ServiceContainer {
   }
 
   async initialize(): Promise<void> {
-    // Already fully initialized — nothing to do
     if (this._ready) return;
 
-    // Another call is already in-flight — wait for the same promise
-    // to avoid creating duplicate service instances
     if (this._initPromise) return this._initPromise;
 
     this._initPromise = (async () => {
@@ -1113,12 +1085,16 @@ export class ServiceContainer {
         this._sound = sound;
         this._scheduler = scheduler;
 
+        // Configure audio session early so the player is ready before
+        // the first alarm fires. This also enables playback over silent
+        // mode on iOS and background-audio on both platforms.
+        await initAudioMode();
+
         // Request notification permissions (non-blocking if denied)
         await notifications.requestPermissions();
 
         this._ready = true;
       } catch (err) {
-        // Reset the promise so a subsequent call can retry
         this._initPromise = null;
         console.error(
           '[ServiceContainer] initialization failed',
