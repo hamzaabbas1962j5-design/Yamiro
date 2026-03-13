@@ -176,10 +176,8 @@ export const useAlarms = () => {
   const initialLoadDone = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep ref in sync for use in stable callbacks
   alarmsRef.current = alarms;
 
-  // Load on mount with validation
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -200,7 +198,6 @@ export const useAlarms = () => {
     return () => { cancelled = true; };
   }, [container]);
 
-  // Persist whenever alarms change after initial load (debounced)
   useEffect(() => {
     if (!initialLoadDone.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -493,7 +490,6 @@ export const useHistory = () => {
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
 
-  // Persist on change after initial load
   useEffect(() => {
     if (!initialLoadDone.current) return;
     container.storage.save(STORAGE_KEYS.HISTORY, entries).catch(() => {});
@@ -515,8 +511,6 @@ export const useHistory = () => {
 // ║  UI PRIMITIVES                                                       ║
 // ╚═══════════════════════════════════════════════════════════════════════╝
 
-// ── GlassCard ────────────────────────────────────────────────────────────
-
 const GlassCard = memo(({ children, style }: { children: React.ReactNode; style?: object }) => {
   const t = useTheme();
   return (
@@ -536,8 +530,6 @@ const GlassCard = memo(({ children, style }: { children: React.ReactNode; style?
     </View>
   );
 });
-
-// ── IconBtn ──────────────────────────────────────────────────────────────
 
 const IconBtn = memo(({
   name,
@@ -569,8 +561,6 @@ const IconBtn = memo(({
     </TouchableOpacity>
   );
 });
-
-// ── FAB ──────────────────────────────────────────────────────────────────
 
 const FAB = memo(({ onPress }: { onPress: () => void }) => {
   const t = useTheme();
@@ -616,8 +606,6 @@ const FAB = memo(({ onPress }: { onPress: () => void }) => {
   );
 });
 
-// ── Chip ─────────────────────────────────────────────────────────────────
-
 const Chip = memo(({
   label,
   active = false,
@@ -652,8 +640,6 @@ const Chip = memo(({
     </TouchableOpacity>
   );
 });
-
-// ── CircularProgress ─────────────────────────────────────────────────────
 
 const CircularProgress = memo(({
   size,
@@ -707,7 +693,7 @@ const CircularProgress = memo(({
 });
 
 // ╔═══════════════════════════════════════════════════════════════════════╗
-// ║  WHEEL PICKER                                                        ║
+// ║  WHEEL PICKER  (fixed: snap-back, dual-snap conflict, index calc)    ║
 // ╚═══════════════════════════════════════════════════════════════════════╝
 
 const WHEEL_ITEM_H = 44;
@@ -741,31 +727,46 @@ const WheelPicker = memo(({
   onChange: (v: number) => void;
   padZero?: boolean;
 }) => {
-  const t = useTheme();
   const data = useMemo(() => Array.from({ length: range }, (_, i) => i), [range]);
   const flatRef = useRef<any>(null);
-  const currentValueRef = useRef(value);
-  const lastHapticIdx = useRef(value);
-  const scrollSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Refs for prop access inside stable callbacks ──────────────────────
+  const valueRef = useRef(value);
+  const rangeRef = useRef(range);
+  const onChangeRef = useRef(onChange);
+  valueRef.current = value;
+  rangeRef.current = range;
+  onChangeRef.current = onChange;
+
+  // ── Internal tracking refs ────────────────────────────────────────────
   const isMounted = useRef(false);
   const isUserScrolling = useRef(false);
+  const lastCommittedValue = useRef(value);
+  const lastHapticIdx = useRef(value);
 
-  // Cleanup timers on unmount
+  // ── Timers ────────────────────────────────────────────────────────────
+  const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Cleanup on unmount ────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      if (scrollSettleTimer.current) {
-        clearTimeout(scrollSettleTimer.current);
-      }
+      if (cooldownTimer.current) clearTimeout(cooldownTimer.current);
+      if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
     };
   }, []);
 
-  // Scroll to initial value on mount (small delay for layout)
+  // ── Scroll to initial value on mount ──────────────────────────────────
   useEffect(() => {
     if (isMounted.current) return;
     isMounted.current = true;
+    lastCommittedValue.current = value;
     const timer = setTimeout(() => {
       try {
-        flatRef.current?.scrollToOffset?.({ offset: value * WHEEL_ITEM_H, animated: false });
+        flatRef.current?.scrollToOffset?.({
+          offset: value * WHEEL_ITEM_H,
+          animated: false,
+        });
       } catch {
         // Ref may not be ready yet
       }
@@ -774,76 +775,124 @@ const WheelPicker = memo(({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Scroll when value changes externally (not from user scrolling)
+  // ── Sync to EXTERNAL value changes only ───────────────────────────────
+  // Skips when: (a) user is actively scrolling, or (b) the new value is
+  // just our own onChange echoing back through the parent re-render.
   useEffect(() => {
     if (!isMounted.current) return;
     if (isUserScrolling.current) return;
-    if (currentValueRef.current !== value) {
-      currentValueRef.current = value;
-      try {
-        flatRef.current?.scrollToOffset?.({ offset: value * WHEEL_ITEM_H, animated: true });
-      } catch {
-        // Ref may not be ready
-      }
+    if (value === lastCommittedValue.current) return;
+
+    lastCommittedValue.current = value;
+    try {
+      flatRef.current?.scrollToOffset?.({
+        offset: value * WHEEL_ITEM_H,
+        animated: true,
+      });
+    } catch {
+      // Ref may not be ready
     }
   }, [value]);
 
+  // ── Render item ───────────────────────────────────────────────────────
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<number>) => <WheelItem num={item} padZero={padZero} />,
     [padZero]
   );
 
-  // Haptic feedback on index change during scroll
+  // ── Haptic feedback during live scroll ────────────────────────────────
+  // All handler callbacks below use refs so they are referentially stable
+  // and never cause the FlatList to receive new handler props mid-scroll.
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
     const idx = Math.round(y / WHEEL_ITEM_H);
-    const clamped = Math.max(0, Math.min(range - 1, idx));
+    const clamped = Math.max(0, Math.min(rangeRef.current - 1, idx));
     if (clamped !== lastHapticIdx.current) {
       lastHapticIdx.current = clamped;
       Haptics.selectionAsync().catch(() => {});
     }
-  }, [range]);
+  }, []);
 
-  // Settle value after scroll ends
-  const settleValue = useCallback((y: number) => {
+  // ── Commit the final selected value ───────────────────────────────────
+  // Does NOT call scrollToOffset — all snapping is handled by
+  // FlatList's native snapToInterval to avoid dual-snap conflicts.
+  const commitValue = useCallback((y: number) => {
+    const r = rangeRef.current;
     const idx = Math.round(y / WHEEL_ITEM_H);
-    const clamped = Math.max(0, Math.min(range - 1, idx));
-    isUserScrolling.current = false;
+    const clamped = Math.max(0, Math.min(r - 1, idx));
 
-    if (clamped !== currentValueRef.current) {
-      currentValueRef.current = clamped;
-      Haptics.selectionAsync().catch(() => {});
-      onChange(clamped);
+    // Prevent duplicate commits for the same position
+    if (clamped === lastCommittedValue.current && clamped === valueRef.current) {
+      isUserScrolling.current = false;
+      return;
     }
-  }, [range, onChange]);
+
+    lastCommittedValue.current = clamped;
+
+    // Keep isUserScrolling true long enough for the parent re-render
+    // cycle to complete so useEffect([value]) won't fight with us.
+    if (cooldownTimer.current) clearTimeout(cooldownTimer.current);
+    cooldownTimer.current = setTimeout(() => {
+      isUserScrolling.current = false;
+    }, 300);
+
+    onChangeRef.current(clamped);
+  }, []);
+
+  // ── Scroll event handlers ─────────────────────────────────────────────
 
   const onScrollBeginDrag = useCallback(() => {
     isUserScrolling.current = true;
-    if (scrollSettleTimer.current) {
-      clearTimeout(scrollSettleTimer.current);
-      scrollSettleTimer.current = null;
+    if (cooldownTimer.current) {
+      clearTimeout(cooldownTimer.current);
+      cooldownTimer.current = null;
+    }
+    if (fallbackTimer.current) {
+      clearTimeout(fallbackTimer.current);
+      fallbackTimer.current = null;
     }
   }, []);
 
-  const onMomentumEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (scrollSettleTimer.current) {
-      clearTimeout(scrollSettleTimer.current);
-      scrollSettleTimer.current = null;
-    }
-    settleValue(e.nativeEvent.contentOffset.y);
-  }, [settleValue]);
+  const onMomentumScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      // Cancel fallback — the authoritative post-snap position is here
+      if (fallbackTimer.current) {
+        clearTimeout(fallbackTimer.current);
+        fallbackTimer.current = null;
+      }
+      commitValue(e.nativeEvent.contentOffset.y);
+    },
+    [commitValue]
+  );
 
-  const onScrollEndDrag = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (scrollSettleTimer.current) {
-      clearTimeout(scrollSettleTimer.current);
-    }
-    const y = e.nativeEvent.contentOffset.y;
-    // Fallback: if onMomentumScrollEnd doesn't fire (no momentum),
-    // settle after a short timeout.
-    scrollSettleTimer.current = setTimeout(() => {
-      settleValue(y);
-    }, 150);
-  }, [settleValue]);
+  const onScrollEndDrag = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      // Safety-net: if onMomentumScrollEnd never fires (very slow release
+      // with zero velocity), commit after a short delay and manually snap
+      // to the nearest valid item.
+      if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+
+      const y = e.nativeEvent.contentOffset.y;
+      const r = rangeRef.current;
+      const idx = Math.round(y / WHEEL_ITEM_H);
+      const clamped = Math.max(0, Math.min(r - 1, idx));
+      const snappedOffset = clamped * WHEEL_ITEM_H;
+
+      fallbackTimer.current = setTimeout(() => {
+        // Ensure the list is snapped to a clean item boundary
+        try {
+          flatRef.current?.scrollToOffset?.({
+            offset: snappedOffset,
+            animated: true,
+          });
+        } catch {
+          // Non-critical
+        }
+        commitValue(snappedOffset);
+      }, 200);
+    },
+    [commitValue]
+  );
 
   return (
     <View
@@ -854,8 +903,6 @@ const WheelPicker = memo(({
         borderRadius: 12,
       }}
     >
-      {/* GHFlatList from react-native-gesture-handler handles nested scroll
-          properly within a parent ScrollView / GestureHandlerRootView */}
       <GHFlatList
         ref={flatRef}
         data={data}
@@ -863,8 +910,9 @@ const WheelPicker = memo(({
         renderItem={renderItem}
         getItemLayout={wheelGetItemLayout}
 
+        // ── Unified snapping: FlatList-native only ──────────────────────
         snapToInterval={WHEEL_ITEM_H}
-        snapToAlignment="center"
+        snapToAlignment="start"
         decelerationRate="fast"
         disableIntervalMomentum
 
@@ -877,18 +925,18 @@ const WheelPicker = memo(({
         onScrollBeginDrag={onScrollBeginDrag}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        onMomentumScrollEnd={onMomentumEnd}
+        onMomentumScrollEnd={onMomentumScrollEnd}
         onScrollEndDrag={onScrollEndDrag}
 
         contentContainerStyle={{ paddingVertical: WHEEL_PAD }}
 
-        // Pre-render all items (max 60) for instant, jank-free scrolling
         removeClippedSubviews={false}
         initialNumToRender={range}
         windowSize={range + 4}
         maxToRenderPerBatch={range}
       />
-      {/* Top/Bottom dimming masks + center highlight */}
+
+      {/* Top / Bottom dimming masks + center highlight bar */}
       <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
         <View style={{ height: WHEEL_PAD, backgroundColor: 'rgba(10,14,26,0.78)' }} />
         <View style={{
@@ -1082,10 +1130,6 @@ export const AlarmEditorModal = memo(({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      {/* GestureHandlerRootView is required inside Modal on Android for
-          react-native-gesture-handler components (GHFlatList) to receive
-          touch events properly. Without this the wheel picker becomes
-          unresponsive inside the modal. */}
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={{ flex: 1, backgroundColor: t.bg }}>
           {/* Header */}
@@ -1376,7 +1420,6 @@ export const DismissChallengeModal = memo(({
   const [typeTarget] = useState('WAKE UP NOW');
   const [typeInput, setTypeInput] = useState('');
 
-  // Auto-dismiss for "None" challenge
   useEffect(() => {
     if (visible && challenge === DismissChallenge.None) {
       onDismiss();
@@ -1610,8 +1653,6 @@ export const DismissChallengeModal = memo(({
 // ║  SCREENS                                                             ║
 // ╚═══════════════════════════════════════════════════════════════════════╝
 
-// ── Alarms Screen ────────────────────────────────────────────────────────
-
 export const AlarmsScreen = memo(() => {
   const t = useTheme();
   const { alarms, loading, addAlarm, updateAlarm, removeAlarm, toggleAlarm } = useAlarms();
@@ -1713,8 +1754,6 @@ export const AlarmsScreen = memo(() => {
     </View>
   );
 });
-
-// ── Timer Screen ─────────────────────────────────────────────────────────
 
 export const TimerScreen = memo(() => {
   const t = useTheme();
@@ -1838,8 +1877,6 @@ export const TimerScreen = memo(() => {
     </View>
   );
 });
-
-// ── Pomodoro Screen ──────────────────────────────────────────────────────
 
 const PHASE_COLORS: Record<PomodoroPhase, string> = {
   [PomodoroPhase.Work]: '#6C63FF',
@@ -1975,8 +2012,6 @@ export const PomodoroScreen = memo(() => {
   );
 });
 
-// ── History Screen ───────────────────────────────────────────────────────
-
 const STATUS_ICONS: Record<
   AlarmHistoryStatus,
   { icon: keyof typeof Ionicons.glyphMap; color: string }
@@ -1991,7 +2026,6 @@ export const HistoryScreen = memo(() => {
   const t = useTheme();
   const { entries, compliance, clearHistory, reload } = useHistory();
 
-  // Refresh when tab gains focus
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
   const keyExtractor = useCallback((item: AlarmHistoryEntry) => item.id, []);
