@@ -20,7 +20,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foregroound.png",
         "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "monochromeImage": "./assets/android-icon-monochirome.png"
       },
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
