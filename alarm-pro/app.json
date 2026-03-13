@@ -18,7 +18,7 @@
       "package": "com.alarmpro.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/android-icon-foreground.png",
+        "foregroundImage": "./assets/android-icon-foregroound.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
