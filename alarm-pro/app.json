@@ -29,15 +29,18 @@
         "SCHEDULE_EXACT_ALARM",
         "USE_EXACT_ALARM",
         "USE_FULL_SCREEN_INTENT",
-        "POST_NOTIFICATIONS"
-      ],
-      "blockedPermissions": [
-        "android.permission.RECORD_AUDIO"
+        "POST_NOTIFICATIONS",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "READ_MEDIA_AUDIO"
       ]
     },
     "ios": {
       "bundleIdentifier": "com.alarmpro.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -49,7 +52,8 @@
           "icon": "./assets/icon.png",
           "color": "#0A0E1A"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "extra": {
       "eas": {
